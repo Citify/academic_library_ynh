@@ -28,9 +28,16 @@ mkdir -p "$install_dir/templates"
 # COPY APPLICATION FILES
 #=================================================
 
-cp "$YNH_APP_BASEDIR/app.py" "$install_dir/"
-cp "$YNH_APP_BASEDIR/requirements.txt" "$install_dir/"
-cp -r "$YNH_APP_BASEDIR/templates"/* "$install_dir/templates/"
+# YunoHost extracts repo to a subdirectory, so we need to find it
+app_src=$(find "$YNH_APP_BASEDIR" -name "app.py" -type f | head -1 | xargs dirname)
+
+if [ -z "$app_src" ] || [ ! -f "$app_src/app.py" ]; then
+    ynh_die --message="Could not find app.py in extracted source"
+fi
+
+cp "$app_src/app.py" "$install_dir/"
+cp "$app_src/requirements.txt" "$install_dir/"
+cp -r "$app_src/templates"/* "$install_dir/templates/"
 
 #=================================================
 # SET PERMISSIONS
@@ -80,7 +87,7 @@ yunohost service add $app --description="Academic Library Service"
 # START SYSTEMD SERVICE
 #=================================================
 
-ynh_systemd_action --service_name=$app --action="start"
+ynh_systemd_action --service_name=$app --action="start" --log_path="/var/log/$app/$app.log"
 
 #=================================================
 # RELOAD NGINX
@@ -92,5 +99,5 @@ ENDOFFILE
 chmod +x scripts/install
 
 git add scripts/install
-git commit -m "Fix install script - remove is_public variable"
+git commit -m "Fix file paths - auto-detect source directory"
 git push
