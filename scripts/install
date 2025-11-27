@@ -28,11 +28,11 @@ mkdir -p "$install_dir/templates"
 # COPY APPLICATION FILES
 #=================================================
 
-# YunoHost extracts repo to a subdirectory, so we need to find it
-app_src=$(find "$YNH_APP_BASEDIR" -name "app.py" -type f | head -1 | xargs dirname)
+# Find the extracted repo directory
+app_src=$(find "$YNH_APP_BASEDIR" -maxdepth 2 -name "manifest.toml" -type f -exec dirname {} \; | head -1)
 
 if [ -z "$app_src" ] || [ ! -f "$app_src/app.py" ]; then
-    ynh_die --message="Could not find app.py in extracted source"
+    ynh_die --message="Could not find app source files in $YNH_APP_BASEDIR"
 fi
 
 cp "$app_src/app.py" "$install_dir/"
@@ -94,10 +94,3 @@ ynh_systemd_action --service_name=$app --action="start" --log_path="/var/log/$ap
 #=================================================
 
 ynh_systemd_action --service_name=nginx --action=reload
-ENDOFFILE
-
-chmod +x scripts/install
-
-git add scripts/install
-git commit -m "Fix file paths - auto-detect source directory"
-git push
