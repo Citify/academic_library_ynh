@@ -1,103 +1,48 @@
-#!/bin/bash
+packaging_format = 2
 
-source _common.sh
-source /usr/share/yunohost/helpers
+id = "academic_library"
+name = "Academic Library"
+description.en = "Free academic books library with covers and metadata"
 
-#=================================================
-# INITIALIZE AND STORE SETTINGS
-#=================================================
+version = "2.0.0~ynh1"
 
-ynh_app_setting_set --app=$app --key=domain --value=$domain
-ynh_app_setting_set --app=$app --key=path --value=$path
+maintainers = ["Citify"]
 
-#=================================================
-# INSTALL DEPENDENCIES
-#=================================================
+[upstream]
+license = "MIT"
+website = "https://github.com/Citify/academic_library_ynh"
+code = "https://github.com/Citify/academic_library_ynh"
 
-ynh_install_app_dependencies $pkg_dependencies
+[integration]
+yunohost = ">= 11.2"
+architectures = "all"
+multi_instance = true
+ldap = false
+sso = false
+disk = "1G"
+ram.build = "512M"
+ram.runtime = "256M"
 
-#=================================================
-# CREATE DIRECTORIES
-#=================================================
+[install]
+    [install.domain]
+    type = "domain"
 
-mkdir -p "$install_dir/uploads/books"
-mkdir -p "$install_dir/uploads/covers"
-mkdir -p "$install_dir/templates"
+    [install.path]
+    type = "path"
+    default = "/library"
 
-#=================================================
-# COPY APPLICATION FILES
-#=================================================
+    [install.init_main_permission]
+    help.en = "If public, anyone can access the library without logging in"
+    type = "group"
+    default = "visitors"
 
-# Find the extracted repo directory
-app_src=$(find "$YNH_APP_BASEDIR" -maxdepth 2 -name "manifest.toml" -type f -exec dirname {} \; | head -1)
+[resources]
+    [resources.system_user]
 
-if [ -z "$app_src" ] || [ ! -f "$app_src/app.py" ]; then
-    ynh_die --message="Could not find app source files in $YNH_APP_BASEDIR"
-fi
+    [resources.install_dir]
 
-cp "$app_src/app.py" "$install_dir/"
-cp "$app_src/requirements.txt" "$install_dir/"
-cp -r "$app_src/templates"/* "$install_dir/templates/"
+    [resources.permissions]
+    main.url = "/"
 
-#=================================================
-# SET PERMISSIONS
-#=================================================
-
-chmod 750 "$install_dir"
-chmod -R o-rwx "$install_dir"
-chown -R $app:www-data "$install_dir"
-chmod -R 770 "$install_dir/uploads"
-
-#=================================================
-# PYTHON VIRTUALENV
-#=================================================
-
-python3 -m venv "$install_dir/venv"
-"$install_dir/venv/bin/pip" install --upgrade pip
-"$install_dir/venv/bin/pip" install -r "$install_dir/requirements.txt"
-
-#=================================================
-# UPDATE SECRET KEY
-#=================================================
-
-secret_key=$(ynh_string_random --length=50)
-ynh_replace_string --match_string="your-super-secret-key-change-this-1234567890" \
-    --replace_string="$secret_key" --target_file="$install_dir/app.py"
-ynh_app_setting_set --app=$app --key=secret_key --value=$secret_key
-
-#=================================================
-# SETUP SYSTEMD
-#=================================================
-
-ynh_add_systemd_config
-
-#=================================================
-# ADD NGINX CONFIGURATION
-#=================================================
-
-ynh_add_nginx_config
-
-#=================================================
-# INTEGRATE SERVICE IN YUNOHOST
-#=================================================
-
-yunohost service add $app --description="Academic Library Service"
-
-#=================================================
-# START SYSTEMD SERVICE
-#=================================================
-
-ynh_systemd_action --service_name=$app --action="start" --log_path="/var/log/$app/$app.log"
-
-#=================================================
-# RELOAD NGINX
-#=================================================
-
-ynh_systemd_action --service_name=nginx --action=reload
-ENDOFFILE
-
-chmod +x scripts/install
-
-git add scripts/install
-git commit -m "Fix find command - search for manifest.toml instead"
-git push
+    [resources.apt]
+    packages = "python3-venv, python3-pip, python3-dev, build-essential, libxml2-dev, libxslt1-dev"
