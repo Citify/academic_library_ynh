@@ -1,0 +1,7 @@
+flask==3.0.0
+flask-sqlalchemy==3.0.5
+werkzeug==3.0.1
+PyPDF2==3.0.1
+ebooklib==0.18
+langdetect==1.0.9
+lxml==5.1.0
