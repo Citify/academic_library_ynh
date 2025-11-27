@@ -43,8 +43,3 @@ ram.runtime = "256M"
 
     [resources.apt]
     packages = "python3-venv, python3-pip, python3-dev, build-essential, libxml2-dev, libxslt1-dev"
-EOF
-
-git add manifest.toml
-git commit -m "Fix manifest format"
-git push
