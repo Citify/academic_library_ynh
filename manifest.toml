@@ -21,18 +21,20 @@ ram.build = "512M"
 ram.runtime = "256M"
 
 [arguments]
-    [arguments.install]
-        [arguments.install.domain]
-        type = "domain"
+    [arguments.install.domain]
+    name = "domain"
+    type = "domain"
 
-        [arguments.install.path]
-        type = "path"
-        default = "/library"
+    [arguments.install.path]
+    name = "path"
+    type = "path"
+    default = "/library"
 
-        [arguments.install.is_public]
-        type = "boolean"
-        default = true
-        help.en = "Should the library be accessible publicly?"
+    [arguments.install.is_public]
+    name = "is_public"
+    type = "boolean"
+    default = true
+    help.en = "Should the library be accessible publicly?"
 
 [resources]
     [resources.system_user]
