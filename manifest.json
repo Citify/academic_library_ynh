@@ -1,20 +1,52 @@
-{
-  "packaging_format": 1,
-  "id": "academic_library",
-  "name": "Academic Library",
-  "description": { "en": "Free academic books with covers, blurbs & secure downloads" },
-  "version": "2.0.0~ynh1",
-  "url": "https://github.com/Citify/academic_library_ynh",
-  "license": "MIT",
-  "maintainer": { "name": "Citify" },
-  "requirements": { "yunohost": ">= 4.3" },
-  "multi_instance": true,
-  "services": [],
-  "arguments": {
-    "install": [
-      { "name": "domain", "type": "domain" },
-      { "name": "path", "type": "path", "default": "/" },
-      { "name": "is_public", "type": "boolean", "default": true }
-    ]
-  }
-}
+packaging_format = 1
+id = "academic_library"
+name = "Academic Library"
+description.en = "Free academic books library with covers and metadata"
+version = "2.0.0~ynh1"
+
+maintainers = ["Citify"]
+
+[upstream]
+license = "MIT"
+website = "https://github.com/Citify/academic_library_ynh"
+code = "https://github.com/Citify/academic_library_ynh"
+
+[integration]
+yunohost = ">= 11.2"
+architectures = "all"
+multi_instance = true
+ldap = false
+sso = false
+disk = "1G"
+ram.build = "512M"
+ram.runtime = "256M"
+
+[install]
+    [install.domain]
+    type = "domain"
+
+    [install.path]
+    type = "path"
+    default = "/library"
+
+    [install.init_main_permission]
+    type = "group"
+    default = "visitors"
+
+[resources]
+    [resources.sources.main]
+    # Dummy source - actual files are already in the repo
+    url = "https://github.com/Citify/academic_library_ynh/archive/refs/heads/main.tar.gz"
+    sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+
+    [resources.system_user]
+
+    [resources.install_dir]
+
+    [resources.permissions]
+    main.url = "/"
+
+    [resources.ports]
+
+    [resources.apt]
+    packages = "python3-venv, python3-pip, python3-dev, build-essential, libxml2-dev, libxslt1-dev"
