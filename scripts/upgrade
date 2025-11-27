@@ -1,0 +1,8 @@
+#!/bin/bash
+
+# Pull latest changes (if git repo)
+cd /var/www/academic_library
+git pull origin main
+
+# Restart service
+sudo systemctl restart academic_library
