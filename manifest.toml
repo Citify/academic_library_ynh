@@ -1,3 +1,6 @@
+cd academic_library_ynh
+
+cat > manifest.toml << 'EOF'
 packaging_format = 1
 id = "academic_library"
 name = "Academic Library"
@@ -9,7 +12,6 @@ maintainers = ["Citify"]
 [upstream]
 license = "MIT"
 website = "https://github.com/Citify/academic_library_ynh"
-code = "https://github.com/Citify/academic_library_ynh"
 
 [integration]
 yunohost = ">= 11.2"
@@ -29,16 +31,12 @@ ram.runtime = "256M"
     type = "path"
     default = "/library"
 
-    [install.init_main_permission]
-    type = "group"
-    default = "visitors"
+    [install.is_public]
+    type = "boolean"
+    default = true
+    help.en = "If enabled, the library will be accessible without authentication"
 
 [resources]
-    [resources.sources.main]
-    # Dummy source - actual files are already in the repo
-    url = "https://github.com/Citify/academic_library_ynh/archive/refs/heads/main.tar.gz"
-    sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
-
     [resources.system_user]
 
     [resources.install_dir]
@@ -46,7 +44,10 @@ ram.runtime = "256M"
     [resources.permissions]
     main.url = "/"
 
-    [resources.ports]
-
     [resources.apt]
     packages = "python3-venv, python3-pip, python3-dev, build-essential, libxml2-dev, libxslt1-dev"
+EOF
+
+git add manifest.toml
+git commit -m "Fix manifest format"
+git push
