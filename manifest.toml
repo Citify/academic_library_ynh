@@ -1,6 +1,3 @@
-cd academic_library_ynh
-
-cat > manifest.toml << 'EOF'
 packaging_format = 1
 id = "academic_library"
 name = "Academic Library"
