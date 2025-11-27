@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Academic Library – Free Educational Books{% endblock %}
+{% block content %}
+<header>
+    <h1>Academic Library</h1>
+    <p style="font-size:1.5rem;margin-top:20px;color:var(--muted);">
+        Free books in 28+ languages • No ads • Community supported
+    </p>
+    <a href="/admin" class="btn" style="position:absolute;top:20px;right:20px;">Admin</a>
+    
+    <!-- DONATE BUTTONS - Prominently at top of header -->
+    {% if donation_links %}
+    <div style="margin-top:30px;display:flex;flex-wrap:wrap;gap:15px;justify-content:center;align-items:center;">
+        <span style="font-weight:600;color:var(--accent2);font-size:1.1rem;">Support Free Education:</span>
+        {% for link in donation_links %}
+        <a href="{{link.url}}" target="_blank" class="btn" style="background:var(--success);padding:10px 20px;">
+            💚 {{link.name}}
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+</header>
+
+<div class="container">
+    <div class="controls">
+        <input type="text" id="search" placeholder="Search titles & authors..." onkeyup="load()">
+        <select id="cat" onchange="load()"><option value="">All Categories</option>{% for c in categories %}<option>{{c}}</option>{% endfor %}</select>
+        <select id="lang" onchange="load()"><option value="">All Languages</option>{% for l in languages %}<option>{{l}}</option>{% endfor %}</select>
+    </div>
+
+    <div id="grid" class="grid"></div>
+    <p id="empty" style="text-align:center;padding:80px;color:var(--muted);display:none;">No books found. Upload some!</p>
+</div>
+
+<script>
+async function load(){
+    const params = new URLSearchParams({search: document.getElementById('search').value, category: document.getElementById('cat').value, language: document.getElementById('lang').value});
+    const res = await fetch('/api/books?'+params);
+    const books = await res.json();
+    document.getElementById('empty').style.display = books.length ? 'none' : 'block';
+    document.getElementById('grid').innerHTML = books.map(b=>`
+        <a href="/book/${b.id}" style="color:inherit;text-decoration:none;">
+            <div class="book">
+                <div class="cover">
+                    ${b.cover_image ? `<img src="${b.cover_image}" alt="${b.title}">` : `<div class="placeholder">${b.title.slice(0,2).toUpperCase()}</div>`}
+                </div>
+                <div class="info">
+                    <div class="title">${b.title}</div>
+                    <div class="author">${b.author}</div>
+                    ${b.description ? `<div class="desc">${b.description.slice(0,150)}${b.description.length>150?'...':''}</div>` : ''}
+                    <div class="meta">${b.category} • ${b.language} • ${b.download_count} downloads</div>
+                </div>
+            </div>
+        </a>
+    `).join('');
+}
+load();
+</script>
+{% endblock %}
