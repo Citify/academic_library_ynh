@@ -1,5 +1,5 @@
 [Unit]
-Description=Academic Library
+Description=Academic Library Service
 After=network.target
 
 [Service]
@@ -10,6 +10,9 @@ WorkingDirectory=__INSTALL_DIR__
 Environment="PATH=__INSTALL_DIR__/venv/bin"
 ExecStart=__INSTALL_DIR__/venv/bin/python __INSTALL_DIR__/app.py
 Restart=always
+RestartSec=10
+StandardOutput=append:/var/log/__APP__/__APP__.log
+StandardError=append:/var/log/__APP__/__APP__.log
 
 [Install]
 WantedBy=multi-user.target
