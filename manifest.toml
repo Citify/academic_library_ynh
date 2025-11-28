@@ -1,5 +1,3 @@
-packaging_format = 2
-
 id = "academic_library"
 name = "Academic Library"
 description.en = "Free academic books library with covers and metadata"
@@ -32,7 +30,6 @@ ram.runtime = "256M"
     default = "/library"
 
     [install.init_main_permission]
-    help.en = "If public, anyone can access the library without logging in"
     type = "group"
     default = "visitors"
 
@@ -46,3 +43,4 @@ ram.runtime = "256M"
 
     [resources.apt]
     packages = "python3-venv, python3-pip, python3-dev, build-essential, libxml2-dev, libxslt1-dev"
+
