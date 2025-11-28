@@ -5,70 +5,124 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Academic Library{% endblock %}</title>
     <style>
-        :root{
-            --bg:#0f1419;--card:#1a1f2e;--accent:#7c3aed;--accent2:#a78bfa;
-            --text:#e2e8f0;--muted:#94a3b8;--border:#334155;--success:#10b981;--danger:#ef4444;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        *{margin:0;padding:0;box-sizing:border-box;}
-        body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;}
-        .container{max-width:1200px;margin:0 auto;padding:20px;}
-        header{text-align:center;padding:80px 20px;background:linear-gradient(135deg,rgba(124,58,237,.25),rgba(107,33,168,.15));}
-        h1{font-size:3.5rem;background:linear-gradient(135deg,var(--accent),var(--accent2));
-           -webkit-background-clip:text;background-clip:text;color:transparent;}
-        .btn{background:var(--accent);color:white;padding:12px 24px;border:none;border-radius:8px;
-             cursor:pointer;font-weight:600;transition:.3s;text-decoration:none;display:inline-block;}
-        .btn:hover{background:var(--accent2);transform:translateY(-3px);}
-        .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:30px;margin-top:40px;}
-        .book{background:var(--card);border-radius:16px;overflow:hidden;border:1px solid var(--border);
-              transition:.3s;box-shadow:0 8px 25px rgba(0,0,0,.4);}
-        .book:hover{transform:translateY(-12px);border-color:var(--accent);}
-        .cover{height:380px;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden;}
-        .cover img{width:100%;height:100%;object-fit:cover;}
-        .cover .placeholder{background:linear-gradient(135deg,var(--accent),var(--accent2));
-                             color:white;font-size:4rem;font-weight:bold;}
-        .info{padding:24px;}
-        .title{font-size:1.4rem;font-weight:700;margin-bottom:8px;}
-        .author{color:var(--accent2);margin:8px 0;}
-        .meta{font-size:0.9rem;color:var(--muted);margin:12px 0;}
-        .desc{margin:12px 0;color:var(--muted);font-size:0.95rem;line-height:1.5;}
-        .controls{display:flex;flex-wrap:wrap;gap:15px;justify-content:center;margin:40px 0;}
-        input,select{padding:12px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);}
-        .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:9999;
-                align-items:center;justify-content:center;}
-        .modal-content{background:var(--card);padding:40px;border-radius:16px;max-width:500px;width:90%;
-                        text-align:center;border:2px solid var(--accent);}
-        footer{text-align:center;padding:60px;color:var(--muted);font-size:0.9rem;}
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .subtitle {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .donate-button {
+            display: inline-block;
+            background: #28a745;
+            color: white;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 25px;
+            font-weight: bold;
+            margin: 20px 0;
+            transition: all 0.3s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        .donate-button:hover {
+            background: #218838;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 8px rgba(0,0,0,0.4);
+        }
+
+        .flash-messages {
+            max-width: 800px;
+            margin: 20px auto;
+        }
+
+        .flash {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .flash.success {
+            background: #28a745;
+        }
+
+        .flash.error {
+            background: #dc3545;
+        }
+
+        footer {
+            text-align: center;
+            padding: 40px 20px;
+            margin-top: 60px;
+            border-top: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .admin-link {
+            display: inline-block;
+            margin-top: 20px;
+            color: rgba(255,255,255,0.7);
+            text-decoration: none;
+            font-size: 0.9em;
+        }
+
+        .admin-link:hover {
+            color: #fff;
+        }
     </style>
+    {% block extra_css %}{% endblock %}
 </head>
 <body>
-    {% block content %}{% endblock %}
+    <div class="container">
+        <header>
+            <h1>📚 Academic Library</h1>
+            <p class="subtitle">Free access to academic books and resources</p>
+            <a href="https://buymeacoffee.com/yournamehere" class="donate-button" target="_blank">☕ Support This Library</a>
+        </header>
 
-    <!-- Email Modal -->
-    <div id="emailModal" class="modal">
-        <div class="modal-content">
-            <h2>Enter your email to download</h2>
-            <p style="margin:20px 0;color:var(--muted);">Helps keep this library free & growing</p>
-            <input type="email" id="emailInput" placeholder="you@example.com" style="width:100%;padding:14px;margin:15px 0;">
-            <button class="btn" onclick="submitEmail()" style="width:100%;padding:14px;font-size:1.1rem;">Download Now</button>
-            <p style="margin-top:20px;font-size:0.8rem;color:var(--muted);">No spam • One-click unsubscribe anytime</p>
-        </div>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+
+        <footer>
+            <p>&copy; 2025 Academic Library. All books are free to download.</p>
+            <a href="{{ url_for('admin') }}" class="admin-link">Admin Login</a>
+        </footer>
     </div>
-
-    <script>
-        let pendingUrl = '';
-        function openEmailModal(url){ pendingUrl=url; document.getElementById('emailModal').style.display='flex'; }
-        function closeModal(){ document.getElementById('emailModal').style.display='none'; pendingUrl=''; }
-        async function submitEmail(){
-            const email = document.getElementById('emailInput').value.trim();
-            if(!email || !email.includes('@')) return alert('Please enter a valid email');
-            const id = pendingUrl.split('/').pop();
-            const res = await fetch('/api/collect-email', {method:'POST',headers:{'Content-Type':'application/json'},
-                body:JSON.stringify({email,book_id:id})});
-            const data = await res.json();
-            if(data.success) { window.location.href = data.download_url; closeModal(); }
-            else alert('Error: '+data.error);
-        }
-        document.addEventListener('keydown',e=>e.key==='Escape'&&closeModal());
-    </script>
 </body>
 </html>
