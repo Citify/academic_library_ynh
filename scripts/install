@@ -28,12 +28,9 @@ mkdir -p "$install_dir/templates"
 # COPY APPLICATION FILES
 #=================================================
 
-# Find app.py in the source/ subdirectory
-app_py_path=$(find "$YNH_APP_BASEDIR" -path "*/source/app.py" -type f | head -1)
-app_src=$(dirname "$app_py_path")
+# Copy all files from the source/ subdirectory to the install directory
+cp -r "$YNH_APP_BASEDIR/source/." "$install_dir/"
 
-# Copy all files from the source/ directory to the install directory
-cp -r "$app_src/." "$install_dir/"
 
 #=================================================
 # SET PERMISSIONS
