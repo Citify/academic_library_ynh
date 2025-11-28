@@ -17,6 +17,18 @@ ynh_app_setting_set --app=$app --key=path --value=$path
 ynh_install_app_dependencies $pkg_dependencies
 
 #=================================================
+# FIND SOURCE FILES
+#=================================================
+# YunoHost extracts repo into subdirectory, find where source/ is
+app_src=$(find "$YNH_APP_BASEDIR" -maxdepth 3 -type d -name "source" | head -1)
+
+if [ -z "$app_src" ]; then
+    ynh_die "Could not find source directory"
+fi
+
+ynh_print_info --message="Found app source at: $app_src"
+
+#=================================================
 # CREATE DIRECTORIES
 #=================================================
 
@@ -28,9 +40,30 @@ mkdir -p "$install_dir/templates"
 # COPY APPLICATION FILES
 #=================================================
 
-# Copy all files from the source/ subdirectory to the install directory
-cp -r "$YNH_APP_BASEDIR/source/." "$install_dir/"
+# Copy main application file (appy.py) and rename to app.py
+if [ -f "$app_src/appy.py" ]; then
+    cp "$app_src/appy.py" "$install_dir/app.py"
+elif [ -f "$app_src/app.py" ]; then
+    cp "$app_src/app.py" "$install_dir/app.py"
+else
+    ynh_die "Could not find appy.py or app.py in source directory"
+fi
 
+# Copy requirements.txt
+cp "$app_src/requirements.txt" "$install_dir/"
+
+# Copy templates directory
+if [ -d "$app_src/templates" ]; then
+    cp -r "$app_src/templates/." "$install_dir/templates/"
+else
+    ynh_die "Could not find templates directory"
+fi
+
+# Copy static directory if it exists
+if [ -d "$app_src/static" ]; then
+    mkdir -p "$install_dir/static"
+    cp -r "$app_src/static/." "$install_dir/static/"
+fi
 
 #=================================================
 # SET PERMISSIONS
@@ -59,6 +92,13 @@ ynh_replace_string --match_string="your-super-secret-key-change-this-1234567890"
 ynh_app_setting_set --app=$app --key=secret_key --value=$secret_key
 
 #=================================================
+# INITIALIZE DATABASE
+#=================================================
+
+# The app will create library.db on first run, just ensure permissions are correct
+chown $app:www-data "$install_dir"
+
+#=================================================
 # SETUP SYSTEMD
 #=================================================
 
@@ -74,7 +114,7 @@ ynh_add_nginx_config
 # INTEGRATE SERVICE IN YUNOHOST
 #=================================================
 
-yunohost service add $app --description="Academic Library Service"
+yunohost service add $app --description="Academic Library Service" --log="/var/log/$app/$app.log"
 
 #=================================================
 # START SYSTEMD SERVICE
@@ -87,3 +127,5 @@ ynh_systemd_action --service_name=$app --action="start" --log_path="/var/log/$ap
 #=================================================
 
 ynh_systemd_action --service_name=nginx --action=reload
+
+ynh_print_info --message="Installation completed successfully!"
