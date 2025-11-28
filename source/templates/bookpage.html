@@ -1,33 +1,192 @@
 {% extends "base.html" %}
-{% block title %}{{ book.title }}{% endblock %}
+
+{% block title %}{{ book.title }} - Academic Library{% endblock %}
+
+{% block extra_css %}
+<style>
+    .book-detail {
+        max-width: 900px;
+        margin: 0 auto;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 15px;
+        overflow: hidden;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .book-header {
+        display: grid;
+        grid-template-columns: 300px 1fr;
+        gap: 30px;
+        padding: 30px;
+    }
+
+    .book-cover-large {
+        width: 100%;
+        height: 400px;
+        object-fit: cover;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 6em;
+    }
+
+    .book-cover-large img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: 10px;
+    }
+
+    .book-details h2 {
+        font-size: 2em;
+        margin-bottom: 15px;
+    }
+
+    .book-author-large {
+        font-size: 1.3em;
+        color: rgba(255, 255, 255, 0.8);
+        margin-bottom: 20px;
+    }
+
+    .book-meta-large {
+        display: flex;
+        gap: 15px;
+        margin: 20px 0;
+        flex-wrap: wrap;
+    }
+
+    .badge-large {
+        padding: 8px 16px;
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.2);
+        font-size: 0.9em;
+    }
+
+    .description-section {
+        padding: 30px;
+        border-top: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .description-section h3 {
+        font-size: 1.5em;
+        margin-bottom: 15px;
+    }
+
+    .description-text {
+        line-height: 1.8;
+        color: rgba(255, 255, 255, 0.9);
+    }
+
+    .download-section {
+        padding: 30px;
+        border-top: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(0, 0, 0, 0.2);
+    }
+
+    .download-form {
+        max-width: 500px;
+    }
+
+    .download-form h3 {
+        font-size: 1.5em;
+        margin-bottom: 15px;
+    }
+
+    .download-form p {
+        margin-bottom: 20px;
+        opacity: 0.9;
+    }
+
+    .download-form input[type="email"] {
+        width: 100%;
+        padding: 15px;
+        border: none;
+        border-radius: 8px;
+        font-size: 1em;
+        margin-bottom: 15px;
+    }
+
+    .download-button {
+        width: 100%;
+        padding: 15px;
+        background: #28a745;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 1.1em;
+        font-weight: bold;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+
+    .download-button:hover {
+        background: #218838;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+
+    .back-link {
+        display: inline-block;
+        margin-bottom: 20px;
+        color: rgba(255, 255, 255, 0.8);
+        text-decoration: none;
+        font-size: 1.1em;
+    }
+
+    .back-link:hover {
+        color: #fff;
+    }
+
+    @media (max-width: 768px) {
+        .book-header {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container" style="margin:60px auto;max-width:1000px;">
-    <div style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start;">
-        <div style="flex:1;min-width:300px;">
+<a href="{{ url_for('index') }}" class="back-link">← Back to Library</a>
+
+<div class="book-detail">
+    <div class="book-header">
+        <div class="book-cover-large">
             {% if book.cover_image %}
-                <img src="{{ url_for('get_cover', book_id=book.id) }}" style="width:100%;max-width:400px;border-radius:16px;box-shadow:0 10px 40px rgba(0,0,0,.6);">
+                <img src="{{ url_for('static', filename='uploads/covers/' + book.cover_image) }}" alt="{{ book.title }}">
             {% else %}
-                <div class="placeholder" style="width:100%;height:580px;font-size:7rem;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#7c3aed,#4c1d95);color:white;border-radius:16px;">
-                    {{ book.title[:2]|upper }}
-                </div>
+                📖
             {% endif %}
         </div>
-        <div style="flex:2;min-width:300px;">
-            <h1 style="font-size:3rem;margin-bottom:8px;">{{ book.title }}</h1>
-            <p style="font-size:1.6rem;color:#a78bfa;margin-bottom:20px;">by {{ book.author or 'Unknown Author' }}</p>
-            <p style="font-size:1.1rem;margin-bottom:20px;">
-                <strong>Category:</strong> {{ book.category }} • 
-                <strong>Language:</strong> {{ book.language }} • 
-                <strong>Downloads:</strong> {{ book.download_count }}
-            </p>
-            <div style="background:var(--card);padding:25px;border-radius:12px;margin:30px 0;line-height:1.8;font-size:1.1rem;">
-                {{ book.description|default('No description available.', true)|replace('\n', '<br>')|safe }}
+        <div class="book-details">
+            <h2>{{ book.title }}</h2>
+            <div class="book-author-large">by {{ book.author }}</div>
+            <div class="book-meta-large">
+                <span class="badge-large">{{ book.file_type|upper }}</span>
+                {% if book.language %}
+                    <span class="badge-large">{{ book.language }}</span>
+                {% endif %}
+                <span class="badge-large">Uploaded: {{ book.upload_date.strftime('%B %d, %Y') }}</span>
             </div>
-            <button class="btn" onclick="openEmailModal('/download/{{ book.id }}')" style="padding:18px 40px;font-size:1.4rem;">
-                Free Download
-            </button>
-            <a href="/" style="margin-left:20px;color:var(--muted);font-size:1.1rem;">← Back to Library</a>
         </div>
+    </div>
+
+    {% if book.description %}
+    <div class="description-section">
+        <h3>Description</h3>
+        <div class="description-text">{{ book.description }}</div>
+    </div>
+    {% endif %}
+
+    <div class="download-section">
+        <form method="post" action="{{ url_for('download_book', book_id=book.id) }}" class="download-form">
+            <h3>Download This Book</h3>
+            <p>Enter your email to download this book for free. We'll never spam you!</p>
+            <input type="email" name="email" placeholder="your@email.com" required>
+            <button type="submit" class="download-button">📥 Download {{ book.file_type|upper }}</button>
+        </form>
     </div>
 </div>
 {% endblock %}
