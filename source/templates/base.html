@@ -13,7 +13,7 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            background: #0a0a0a;
             min-height: 100vh;
             color: #fff;
         }
@@ -32,17 +32,20 @@
         h1 {
             font-size: 3em;
             margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
 
         .subtitle {
             font-size: 1.2em;
-            opacity: 0.9;
+            color: #888;
         }
 
         .donate-button {
             display: inline-block;
-            background: #28a745;
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
             color: white;
             padding: 12px 30px;
             text-decoration: none;
@@ -50,13 +53,12 @@
             font-weight: bold;
             margin: 20px 0;
             transition: all 0.3s;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.4);
         }
 
         .donate-button:hover {
-            background: #218838;
             transform: translateY(-2px);
-            box-shadow: 0 6px 8px rgba(0,0,0,0.4);
+            box-shadow: 0 6px 20px rgba(40, 167, 69, 0.6);
         }
 
         .flash-messages {
@@ -82,19 +84,19 @@
             text-align: center;
             padding: 40px 20px;
             margin-top: 60px;
-            border-top: 1px solid rgba(255,255,255,0.2);
+            border-top: 1px solid #222;
         }
 
         .admin-link {
             display: inline-block;
             margin-top: 20px;
-            color: rgba(255,255,255,0.7);
+            color: #666;
             text-decoration: none;
             font-size: 0.9em;
         }
 
         .admin-link:hover {
-            color: #fff;
+            color: #888;
         }
     </style>
     {% block extra_css %}{% endblock %}
@@ -120,7 +122,7 @@
         {% block content %}{% endblock %}
 
         <footer>
-            <p>&copy; 2025 Academic Library. All books are free to download.</p>
+            <p style="color: #666;">&copy; 2025 Academic Library. All books are free to download.</p>
             <a href="{{ url_for('admin') }}" class="admin-link">Admin Login</a>
         </footer>
     </div>
