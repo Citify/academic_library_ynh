@@ -51,32 +51,60 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'pdf', 'epub'}
 
 def extract_metadata_from_opf(opf_path):
-    """Extract metadata from .opf file (Calibre format)"""
+    """Extract metadata from .opf file (Calibre format) - IMPROVED"""
     try:
-        tree = etree.parse(opf_path)
-        root = tree.getroot()
-        ns = {'dc': 'http://purl.org/dc/elements/1.1/', 
-              'opf': 'http://www.idpf.org/2007/opf'}
+        with open(opf_path, 'rb') as f:
+            content = f.read()
+        
+        # Parse with lxml
+        tree = etree.fromstring(content)
+        
+        # Try multiple namespace variations
+        namespaces = {
+            'dc': 'http://purl.org/dc/elements/1.1/',
+            'opf': 'http://www.idpf.org/2007/opf',
+            'dc2': 'http://purl.org/dc/terms/'
+        }
         
         metadata = {}
-        title = root.find('.//dc:title', ns)
-        if title is not None and title.text:
-            metadata['title'] = title.text
         
-        creator = root.find('.//dc:creator', ns)
-        if creator is not None and creator.text:
-            metadata['author'] = creator.text
+        # Try to find title
+        for ns_key in ['dc', 'dc2']:
+            title = tree.find(f'.//{{{namespaces[ns_key]}}}title')
+            if title is not None and title.text:
+                metadata['title'] = title.text.strip()
+                break
         
-        description = root.find('.//dc:description', ns)
-        if description is not None and description.text:
-            metadata['description'] = description.text
+        # Try to find author/creator
+        for ns_key in ['dc', 'dc2']:
+            creator = tree.find(f'.//{{{namespaces[ns_key]}}}creator')
+            if creator is not None and creator.text:
+                metadata['author'] = creator.text.strip()
+                break
         
-        language = root.find('.//dc:language', ns)
-        if language is not None and language.text:
-            metadata['language'] = language.text
+        # Try to find description
+        for ns_key in ['dc', 'dc2']:
+            description = tree.find(f'.//{{{namespaces[ns_key]}}}description')
+            if description is not None and description.text:
+                metadata['description'] = description.text.strip()
+                break
         
+        # Try to find language
+        for ns_key in ['dc', 'dc2']:
+            language = tree.find(f'.//{{{namespaces[ns_key]}}}language')
+            if language is not None and language.text:
+                lang = language.text.strip().lower()
+                # Normalize language codes
+                if lang.startswith('en'):
+                    lang = 'en'
+                elif lang in SUPPORTED_LANGUAGES:
+                    metadata['language'] = lang
+                break
+        
+        print(f"OPF extracted metadata: {metadata}")  # Debug logging
         return metadata
-    except:
+    except Exception as e:
+        print(f"Error parsing OPF: {e}")  # Debug logging
         return {}
 
 def extract_pdf_metadata(file_path):
@@ -87,22 +115,25 @@ def extract_pdf_metadata(file_path):
             
             info = {}
             if metadata:
-                info['title'] = metadata.get('/Title', '')
-                info['author'] = metadata.get('/Author', '')
+                if metadata.get('/Title'):
+                    info['title'] = str(metadata.get('/Title')).strip()
+                if metadata.get('/Author'):
+                    info['author'] = str(metadata.get('/Author')).strip()
             
             # Try to extract text for language detection
             if len(pdf_reader.pages) > 0:
-                text = pdf_reader.pages[0].extract_text()[:500]
-                if text:
-                    try:
+                try:
+                    text = pdf_reader.pages[0].extract_text()[:500]
+                    if text and len(text) > 50:
                         detected_lang = detect(text)
                         if detected_lang in SUPPORTED_LANGUAGES:
                             info['language'] = detected_lang
-                    except:
-                        pass
+                except:
+                    pass
             
             return info
-    except:
+    except Exception as e:
+        print(f"Error extracting PDF metadata: {e}")
         return {}
 
 def extract_epub_metadata(file_path):
@@ -110,26 +141,29 @@ def extract_epub_metadata(file_path):
         book = epub.read_epub(file_path)
         info = {}
         
-        info['title'] = book.get_metadata('DC', 'title')
-        if info['title']:
-            info['title'] = info['title'][0][0] if info['title'] else ''
+        title_meta = book.get_metadata('DC', 'title')
+        if title_meta and len(title_meta) > 0:
+            info['title'] = str(title_meta[0][0]).strip()
         
-        info['author'] = book.get_metadata('DC', 'creator')
-        if info['author']:
-            info['author'] = info['author'][0][0] if info['author'] else ''
+        author_meta = book.get_metadata('DC', 'creator')
+        if author_meta and len(author_meta) > 0:
+            info['author'] = str(author_meta[0][0]).strip()
         
-        info['description'] = book.get_metadata('DC', 'description')
-        if info['description']:
-            info['description'] = info['description'][0][0] if info['description'] else ''
+        desc_meta = book.get_metadata('DC', 'description')
+        if desc_meta and len(desc_meta) > 0:
+            info['description'] = str(desc_meta[0][0]).strip()
         
-        info['language'] = book.get_metadata('DC', 'language')
-        if info['language']:
-            lang = info['language'][0][0] if info['language'] else ''
+        lang_meta = book.get_metadata('DC', 'language')
+        if lang_meta and len(lang_meta) > 0:
+            lang = str(lang_meta[0][0]).strip().lower()
+            if lang.startswith('en'):
+                lang = 'en'
             if lang in SUPPORTED_LANGUAGES:
                 info['language'] = lang
         
         return info
-    except:
+    except Exception as e:
+        print(f"Error extracting EPUB metadata: {e}")
         return {}
 
 def extract_epub_cover(file_path, cover_filename):
@@ -141,8 +175,8 @@ def extract_epub_cover(file_path, cover_filename):
                 with open(cover_path, 'wb') as f:
                     f.write(item.get_content())
                 return cover_filename
-    except:
-        pass
+    except Exception as e:
+        print(f"Error extracting EPUB cover: {e}")
     return None
 
 @app.route('/')
@@ -233,17 +267,32 @@ def upload_book():
         
         file_type = filename.rsplit('.', 1)[1].lower()
         
-        # Extract metadata
+        # Priority: OPF file > Book metadata > Form input
         metadata = {}
+        
+        # First try OPF file if provided
         if opf_file and opf_file.filename.endswith('.opf'):
             opf_path = os.path.join(app.config['UPLOAD_FOLDER'], 'temp.opf')
             opf_file.save(opf_path)
-            metadata = extract_metadata_from_opf(opf_path)
+            opf_metadata = extract_metadata_from_opf(opf_path)
+            metadata.update(opf_metadata)
             os.remove(opf_path)
-        elif file_type == 'pdf':
-            metadata = extract_pdf_metadata(file_path)
+            print(f"Metadata from OPF: {opf_metadata}")
+        
+        # Then try extracting from the book file itself
+        if file_type == 'pdf':
+            book_metadata = extract_pdf_metadata(file_path)
+            # Only use book metadata if OPF didn't provide it
+            for key in ['title', 'author', 'description', 'language']:
+                if key not in metadata or not metadata[key]:
+                    if key in book_metadata and book_metadata[key]:
+                        metadata[key] = book_metadata[key]
         elif file_type == 'epub':
-            metadata = extract_epub_metadata(file_path)
+            book_metadata = extract_epub_metadata(file_path)
+            for key in ['title', 'author', 'description', 'language']:
+                if key not in metadata or not metadata[key]:
+                    if key in book_metadata and book_metadata[key]:
+                        metadata[key] = book_metadata[key]
         
         # Handle cover image
         cover_filename = None
@@ -255,12 +304,18 @@ def upload_book():
         elif file_type == 'epub':
             cover_filename = extract_epub_cover(file_path, f"cover_{filename.rsplit('.', 1)[0]}.jpg")
         
+        # Form inputs override everything
+        final_title = request.form.get('title', '').strip() or metadata.get('title', '') or filename
+        final_author = request.form.get('author', '').strip() or metadata.get('author', '') or 'Unknown'
+        final_description = request.form.get('description', '').strip() or metadata.get('description', '') or ''
+        final_language = request.form.get('language', '').strip() or metadata.get('language', '') or 'en'
+        
         # Create book entry
         book = Book(
-            title=request.form.get('title') or metadata.get('title', filename),
-            author=request.form.get('author') or metadata.get('author', 'Unknown'),
-            description=request.form.get('description') or metadata.get('description', ''),
-            language=request.form.get('language') or metadata.get('language', 'en'),
+            title=final_title,
+            author=final_author,
+            description=final_description,
+            language=final_language,
             filename=filename,
             cover_image=cover_filename,
             file_type=file_type
