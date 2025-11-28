@@ -7,11 +7,10 @@
     .book-detail {
         max-width: 900px;
         margin: 0 auto;
-        background: rgba(255, 255, 255, 0.1);
+        background: #1a1a1a;
         border-radius: 15px;
         overflow: hidden;
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.2);
+        border: 1px solid #333;
     }
 
     .book-header {
@@ -47,7 +46,7 @@
 
     .book-author-large {
         font-size: 1.3em;
-        color: rgba(255, 255, 255, 0.8);
+        color: #888;
         margin-bottom: 20px;
     }
 
@@ -61,13 +60,14 @@
     .badge-large {
         padding: 8px 16px;
         border-radius: 20px;
-        background: rgba(255, 255, 255, 0.2);
+        background: #2a2a2a;
+        color: #888;
         font-size: 0.9em;
     }
 
     .description-section {
         padding: 30px;
-        border-top: 1px solid rgba(255, 255, 255, 0.2);
+        border-top: 1px solid #333;
     }
 
     .description-section h3 {
@@ -77,13 +77,13 @@
 
     .description-text {
         line-height: 1.8;
-        color: rgba(255, 255, 255, 0.9);
+        color: #aaa;
     }
 
     .download-section {
         padding: 30px;
-        border-top: 1px solid rgba(255, 255, 255, 0.2);
-        background: rgba(0, 0, 0, 0.2);
+        border-top: 1px solid #333;
+        background: #0f0f0f;
     }
 
     .download-form {
@@ -97,13 +97,15 @@
 
     .download-form p {
         margin-bottom: 20px;
-        opacity: 0.9;
+        color: #888;
     }
 
     .download-form input[type="email"] {
         width: 100%;
         padding: 15px;
-        border: none;
+        border: 1px solid #333;
+        background: #1a1a1a;
+        color: #fff;
         border-radius: 8px;
         font-size: 1em;
         margin-bottom: 15px;
@@ -112,7 +114,7 @@
     .download-button {
         width: 100%;
         padding: 15px;
-        background: #28a745;
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
         color: white;
         border: none;
         border-radius: 8px;
@@ -123,15 +125,14 @@
     }
 
     .download-button:hover {
-        background: #218838;
         transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        box-shadow: 0 4px 15px rgba(40, 167, 69, 0.4);
     }
 
     .back-link {
         display: inline-block;
         margin-bottom: 20px;
-        color: rgba(255, 255, 255, 0.8);
+        color: #888;
         text-decoration: none;
         font-size: 1.1em;
     }
@@ -155,7 +156,7 @@
     <div class="book-header">
         <div class="book-cover-large">
             {% if book.cover_image %}
-                <img src="{{ url_for('static', filename='uploads/covers/' + book.cover_image) }}" alt="{{ book.title }}">
+                <img src="{{ url_for('serve_uploads', subpath='covers', filename=book.cover_image) }}" alt="{{ book.title }}">
             {% else %}
                 📖
             {% endif %}
