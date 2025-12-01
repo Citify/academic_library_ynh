@@ -177,7 +177,7 @@
     {% if book.description %}
     <div class="description-section">
         <h3>Description</h3>
-        <div class="description-text">{{ book.description }}</div>
+        <div class="description-text">{{ book.description|strip_html }}</div>
     </div>
     {% endif %}
 
