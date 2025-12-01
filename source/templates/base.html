@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Academic Library{% endblock %}</title>
+    <title>{% block title %}Leshley's Library{% endblock %}</title>
+    <meta name="description" content="Free academic books in 28+ languages. Curated by Lyon Leshley.">
     <style>
         * {
             margin: 0;
@@ -29,9 +30,24 @@
             padding: 40px 20px;
         }
 
+        .logo-title {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+
+        .logo {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 3px solid #667eea;
+            box-shadow: 0 0 20px rgba(102, 126, 234, 0.4);
+        }
+
         h1 {
             font-size: 3em;
-            margin-bottom: 10px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -41,7 +57,13 @@
         .subtitle {
             font-size: 1.2em;
             color: #888;
-            margin-bottom: 30px;
+            margin-bottom: 10px;
+        }
+
+        .curator {
+            font-size: 0.9em;
+            color: #666;
+            font-style: italic;
         }
 
         .links-section {
@@ -146,14 +168,18 @@
 <body>
     <div class="container">
         <header>
-            <h1>📚 Academic Library</h1>
-            <p class="subtitle">Free access to academic books and resources</p>
+            <div class="logo-title">
+                <img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDABQODxIPDRQSEBIXFRQdHx4eHRoaHSQtJSEkMjU1LTAwMEBARUBAOzs/OEBEQFQ=" class="logo" alt="Leshley's Library Logo">
+                <h1>Leshley's Library</h1>
+            </div>
+            <p class="subtitle">Free academic books in 28+ languages</p>
+            <p class="curator">Curated by Lyon Leshley</p>
             
             {% if donation_links or social_links %}
             <div class="links-section">
                 {% if donation_links %}
                 <div class="links-group">
-                    <h3>💚 Support Us</h3>
+                    <h3>💚 Support the Library</h3>
                     <div class="link-list">
                         {% for link in donation_links %}
                         <a href="{{ link.url }}" class="donation-link" target="_blank">
@@ -169,7 +195,7 @@
                 
                 {% if social_links %}
                 <div class="links-group">
-                    <h3>🌐 Connect With Us</h3>
+                    <h3>🌐 Connect</h3>
                     <div class="link-list">
                         {% for link in social_links %}
                         <a href="{{ link.url }}" class="social-link" target="_blank">
@@ -199,7 +225,8 @@
         {% block content %}{% endblock %}
 
         <footer>
-            <p style="color: #666;">&copy; 2025 Academic Library. All books are free to download.</p>
+            <p style="color: #666;">&copy; 2025 Leshley's Library. All books are free to download.</p>
+            <p style="color: #555; font-size: 0.9em; margin-top: 10px;">Curated with ❤️ by Lyon Leshley</p>
             <a href="{{ url_for('admin') }}" class="admin-link">Admin Login</a>
         </footer>
     </div>
