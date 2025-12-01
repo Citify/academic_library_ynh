@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, send_file, send_from_directory, flash
+from flask import Flask, render_template, request, redirect, url_for, send_file, send_from_directory, flash, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
 import os
@@ -8,13 +8,15 @@ import ebooklib
 from ebooklib import epub
 from langdetect import detect
 from lxml import etree
+import zipfile
+import shutil
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-super-secret-key-change-this-1234567890'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///library.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max file size
+app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB max file size for zip files
 
 db = SQLAlchemy(app)
 
@@ -42,6 +44,26 @@ class Download(db.Model):
     email = db.Column(db.String(200), nullable=False)
     download_date = db.Column(db.DateTime, default=datetime.utcnow)
 
+class SiteSettings(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(100), unique=True, nullable=False)
+    value = db.Column(db.Text)
+    description = db.Column(db.String(500))
+
+class SocialLink(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    platform = db.Column(db.String(100), nullable=False)
+    url = db.Column(db.String(500), nullable=False)
+    description = db.Column(db.String(200))
+    order = db.Column(db.Integer, default=0)
+
+class DonationLink(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    platform = db.Column(db.String(100), nullable=False)
+    url = db.Column(db.String(500), nullable=False)
+    description = db.Column(db.String(200))
+    order = db.Column(db.Integer, default=0)
+
 # Route to serve uploaded files
 @app.route('/uploads/<path:subpath>/<filename>')
 def serve_uploads(subpath, filename):
@@ -51,15 +73,13 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'pdf', 'epub'}
 
 def extract_metadata_from_opf(opf_path):
-    """Extract metadata from .opf file (Calibre format) - IMPROVED"""
+    """Extract metadata from .opf file (Calibre format)"""
     try:
         with open(opf_path, 'rb') as f:
             content = f.read()
         
-        # Parse with lxml
         tree = etree.fromstring(content)
         
-        # Try multiple namespace variations
         namespaces = {
             'dc': 'http://purl.org/dc/elements/1.1/',
             'opf': 'http://www.idpf.org/2007/opf',
@@ -68,43 +88,37 @@ def extract_metadata_from_opf(opf_path):
         
         metadata = {}
         
-        # Try to find title
         for ns_key in ['dc', 'dc2']:
             title = tree.find(f'.//{{{namespaces[ns_key]}}}title')
             if title is not None and title.text:
                 metadata['title'] = title.text.strip()
                 break
         
-        # Try to find author/creator
         for ns_key in ['dc', 'dc2']:
             creator = tree.find(f'.//{{{namespaces[ns_key]}}}creator')
             if creator is not None and creator.text:
                 metadata['author'] = creator.text.strip()
                 break
         
-        # Try to find description
         for ns_key in ['dc', 'dc2']:
             description = tree.find(f'.//{{{namespaces[ns_key]}}}description')
             if description is not None and description.text:
                 metadata['description'] = description.text.strip()
                 break
         
-        # Try to find language
         for ns_key in ['dc', 'dc2']:
             language = tree.find(f'.//{{{namespaces[ns_key]}}}language')
             if language is not None and language.text:
                 lang = language.text.strip().lower()
-                # Normalize language codes
                 if lang.startswith('en'):
                     lang = 'en'
                 elif lang in SUPPORTED_LANGUAGES:
                     metadata['language'] = lang
                 break
         
-        print(f"OPF extracted metadata: {metadata}")  # Debug logging
         return metadata
     except Exception as e:
-        print(f"Error parsing OPF: {e}")  # Debug logging
+        print(f"Error parsing OPF: {e}")
         return {}
 
 def extract_pdf_metadata(file_path):
@@ -120,7 +134,6 @@ def extract_pdf_metadata(file_path):
                 if metadata.get('/Author'):
                     info['author'] = str(metadata.get('/Author')).strip()
             
-            # Try to extract text for language detection
             if len(pdf_reader.pages) > 0:
                 try:
                     text = pdf_reader.pages[0].extract_text()[:500]
@@ -179,6 +192,54 @@ def extract_epub_cover(file_path, cover_filename):
         print(f"Error extracting EPUB cover: {e}")
     return None
 
+def process_calibre_book(book_folder_path):
+    """Process a single book from Calibre export"""
+    metadata = {}
+    book_file = None
+    opf_file = None
+    cover_file = None
+    
+    # Find book file, OPF, and cover
+    for filename in os.listdir(book_folder_path):
+        file_path = os.path.join(book_folder_path, filename)
+        if filename.endswith('.opf'):
+            opf_file = file_path
+        elif filename.endswith(('.pdf', '.epub')):
+            book_file = file_path
+        elif filename.lower().endswith(('.jpg', '.jpeg', '.png')) and 'cover' in filename.lower():
+            cover_file = file_path
+    
+    if not book_file:
+        return None
+    
+    # Extract metadata from OPF first
+    if opf_file:
+        metadata = extract_metadata_from_opf(opf_file)
+    
+    # Get file info
+    filename = os.path.basename(book_file)
+    file_type = filename.rsplit('.', 1)[1].lower()
+    
+    # Extract metadata from book if OPF didn't provide it
+    if file_type == 'pdf':
+        book_metadata = extract_pdf_metadata(book_file)
+    elif file_type == 'epub':
+        book_metadata = extract_epub_metadata(book_file)
+    else:
+        book_metadata = {}
+    
+    for key in ['title', 'author', 'description', 'language']:
+        if key not in metadata or not metadata.get(key):
+            if key in book_metadata and book_metadata.get(key):
+                metadata[key] = book_metadata[key]
+    
+    return {
+        'book_file': book_file,
+        'cover_file': cover_file,
+        'metadata': metadata,
+        'file_type': file_type
+    }
+
 @app.route('/')
 def index():
     search_query = request.args.get('search', '')
@@ -201,12 +262,16 @@ def index():
     
     books = query.order_by(Book.upload_date.desc()).all()
     
-    # Get unique languages for filter
     languages = db.session.query(Book.language).distinct().all()
     languages = [lang[0] for lang in languages if lang[0]]
     
+    # Get social and donation links
+    social_links = SocialLink.query.order_by(SocialLink.order).all()
+    donation_links = DonationLink.query.order_by(DonationLink.order).all()
+    
     return render_template('index.html', books=books, search_query=search_query, 
-                         languages=languages, selected_language=language_filter)
+                         languages=languages, selected_language=language_filter,
+                         social_links=social_links, donation_links=donation_links)
 
 @app.route('/book/<int:book_id>')
 def book_page(book_id):
@@ -222,7 +287,6 @@ def download_book(book_id):
         flash('Email is required to download', 'error')
         return redirect(url_for('book_page', book_id=book_id))
     
-    # Record the download
     download = Download(book_id=book_id, email=email)
     db.session.add(download)
     db.session.commit()
@@ -245,7 +309,11 @@ def admin():
 def admin_panel():
     books = Book.query.order_by(Book.upload_date.desc()).all()
     total_downloads = Download.query.count()
-    return render_template('admin.html', books=books, total_downloads=total_downloads)
+    social_links = SocialLink.query.order_by(SocialLink.order).all()
+    donation_links = DonationLink.query.order_by(DonationLink.order).all()
+    
+    return render_template('admin.html', books=books, total_downloads=total_downloads,
+                         social_links=social_links, donation_links=donation_links)
 
 @app.route('/admin/upload', methods=['POST'])
 def upload_book():
@@ -267,22 +335,17 @@ def upload_book():
         
         file_type = filename.rsplit('.', 1)[1].lower()
         
-        # Priority: OPF file > Book metadata > Form input
         metadata = {}
         
-        # First try OPF file if provided
         if opf_file and opf_file.filename.endswith('.opf'):
             opf_path = os.path.join(app.config['UPLOAD_FOLDER'], 'temp.opf')
             opf_file.save(opf_path)
             opf_metadata = extract_metadata_from_opf(opf_path)
             metadata.update(opf_metadata)
             os.remove(opf_path)
-            print(f"Metadata from OPF: {opf_metadata}")
         
-        # Then try extracting from the book file itself
         if file_type == 'pdf':
             book_metadata = extract_pdf_metadata(file_path)
-            # Only use book metadata if OPF didn't provide it
             for key in ['title', 'author', 'description', 'language']:
                 if key not in metadata or not metadata[key]:
                     if key in book_metadata and book_metadata[key]:
@@ -294,7 +357,6 @@ def upload_book():
                     if key in book_metadata and book_metadata[key]:
                         metadata[key] = book_metadata[key]
         
-        # Handle cover image
         cover_filename = None
         if 'cover_image' in request.files and request.files['cover_image'].filename:
             cover_file = request.files['cover_image']
@@ -304,13 +366,11 @@ def upload_book():
         elif file_type == 'epub':
             cover_filename = extract_epub_cover(file_path, f"cover_{filename.rsplit('.', 1)[0]}.jpg")
         
-        # Form inputs override everything
         final_title = request.form.get('title', '').strip() or metadata.get('title', '') or filename
         final_author = request.form.get('author', '').strip() or metadata.get('author', '') or 'Unknown'
         final_description = request.form.get('description', '').strip() or metadata.get('description', '') or ''
         final_language = request.form.get('language', '').strip() or metadata.get('language', '') or 'en'
         
-        # Create book entry
         book = Book(
             title=final_title,
             author=final_author,
@@ -327,6 +387,76 @@ def upload_book():
         flash(f'Book "{book.title}" uploaded successfully!', 'success')
     else:
         flash('Invalid file type. Only PDF and EPUB allowed.', 'error')
+    
+    return redirect(url_for('admin_panel'))
+
+@app.route('/admin/upload-calibre-zip', methods=['POST'])
+def upload_calibre_zip():
+    if 'zip_file' not in request.files:
+        flash('No file selected', 'error')
+        return redirect(url_for('admin_panel'))
+    
+    file = request.files['zip_file']
+    
+    if file.filename == '' or not file.filename.endswith('.zip'):
+        flash('Please upload a valid ZIP file', 'error')
+        return redirect(url_for('admin_panel'))
+    
+    temp_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'temp_calibre')
+    os.makedirs(temp_dir, exist_ok=True)
+    
+    zip_path = os.path.join(temp_dir, 'calibre_export.zip')
+    file.save(zip_path)
+    
+    books_added = 0
+    books_failed = 0
+    
+    try:
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(temp_dir)
+        
+        for root, dirs, files in os.walk(temp_dir):
+            if any(f.endswith(('.pdf', '.epub')) for f in files):
+                book_data = process_calibre_book(root)
+                
+                if book_data:
+                    filename = secure_filename(os.path.basename(book_data['book_file']))
+                    dest_path = os.path.join(app.config['UPLOAD_FOLDER'], 'books', filename)
+                    shutil.copy2(book_data['book_file'], dest_path)
+                    
+                    cover_filename = None
+                    if book_data['cover_file']:
+                        cover_filename = secure_filename(f"cover_{filename.rsplit('.', 1)[0]}.jpg")
+                        cover_path = os.path.join(app.config['UPLOAD_FOLDER'], 'covers', cover_filename)
+                        shutil.copy2(book_data['cover_file'], cover_path)
+                    elif book_data['file_type'] == 'epub':
+                        cover_filename = extract_epub_cover(dest_path, f"cover_{filename.rsplit('.', 1)[0]}.jpg")
+                    
+                    metadata = book_data['metadata']
+                    book = Book(
+                        title=metadata.get('title', filename),
+                        author=metadata.get('author', 'Unknown'),
+                        description=metadata.get('description', ''),
+                        language=metadata.get('language', 'en'),
+                        filename=filename,
+                        cover_image=cover_filename,
+                        file_type=book_data['file_type']
+                    )
+                    
+                    db.session.add(book)
+                    books_added += 1
+    
+    except Exception as e:
+        print(f"Error processing ZIP: {e}")
+        flash(f'Error processing ZIP file: {str(e)}', 'error')
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+    
+    if books_added > 0:
+        db.session.commit()
+        flash(f'Successfully added {books_added} books from Calibre export!', 'success')
+    else:
+        flash('No valid books found in the ZIP file', 'error')
     
     return redirect(url_for('admin_panel'))
 
@@ -357,7 +487,6 @@ def edit_book(book_id):
 def delete_book(book_id):
     book = Book.query.get_or_404(book_id)
     
-    # Delete files
     book_path = os.path.join(app.config['UPLOAD_FOLDER'], 'books', book.filename)
     if os.path.exists(book_path):
         os.remove(book_path)
@@ -367,14 +496,64 @@ def delete_book(book_id):
         if os.path.exists(cover_path):
             os.remove(cover_path)
     
-    # Delete download records
     Download.query.filter_by(book_id=book_id).delete()
     
-    # Delete book
     db.session.delete(book)
     db.session.commit()
     
     flash(f'Book "{book.title}" deleted successfully!', 'success')
+    return redirect(url_for('admin_panel'))
+
+# Social Links Management
+@app.route('/admin/social/add', methods=['POST'])
+def add_social_link():
+    platform = request.form.get('platform', '').strip()
+    url = request.form.get('url', '').strip()
+    description = request.form.get('description', '').strip()
+    
+    if platform and url:
+        max_order = db.session.query(db.func.max(SocialLink.order)).scalar() or 0
+        social = SocialLink(platform=platform, url=url, description=description, order=max_order + 1)
+        db.session.add(social)
+        db.session.commit()
+        flash(f'Social link "{platform}" added!', 'success')
+    else:
+        flash('Platform and URL are required', 'error')
+    
+    return redirect(url_for('admin_panel'))
+
+@app.route('/admin/social/delete/<int:link_id>', methods=['POST'])
+def delete_social_link(link_id):
+    link = SocialLink.query.get_or_404(link_id)
+    db.session.delete(link)
+    db.session.commit()
+    flash('Social link deleted!', 'success')
+    return redirect(url_for('admin_panel'))
+
+# Donation Links Management
+@app.route('/admin/donation/add', methods=['POST'])
+def add_donation_link():
+    platform = request.form.get('platform', '').strip()
+    url = request.form.get('url', '').strip()
+    description = request.form.get('description', '').strip()
+    
+    if platform and url:
+        max_order = db.session.query(db.func.max(DonationLink.order)).scalar() or 0
+        donation = DonationLink(platform=platform, url=url, description=description, order=max_order + 1)
+        db.session.add(donation)
+        db.session.commit()
+        flash(f'Donation link "{platform}" added!', 'success')
+    else:
+        flash('Platform and URL are required', 'error')
+    
+    return redirect(url_for('admin_panel'))
+
+@app.route('/admin/donation/delete/<int:link_id>', methods=['POST'])
+def delete_donation_link(link_id):
+    link = DonationLink.query.get_or_404(link_id)
+    db.session.delete(link)
+    db.session.commit()
+    flash('Donation link deleted!', 'success')
     return redirect(url_for('admin_panel'))
 
 if __name__ == '__main__':
