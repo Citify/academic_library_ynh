@@ -10,6 +10,8 @@ from langdetect import detect
 from lxml import etree
 import zipfile
 import shutil
+import re
+from html import unescape
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-super-secret-key-change-this-1234567890'
@@ -19,6 +21,21 @@ app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB max file size for zip files
 
 db = SQLAlchemy(app)
+
+# Custom filter to strip HTML tags
+@app.template_filter('strip_html')
+def strip_html_tags(text):
+    """Remove HTML tags from a string"""
+    if not text:
+        return ''
+    # Unescape HTML entities first
+    text = unescape(text)
+    # Remove HTML tags
+    clean = re.compile('<.*?>')
+    text = re.sub(clean, '', text)
+    # Remove extra whitespace
+    text = ' '.join(text.split())
+    return text
 
 # Supported languages
 SUPPORTED_LANGUAGES = [
@@ -103,7 +120,13 @@ def extract_metadata_from_opf(opf_path):
         for ns_key in ['dc', 'dc2']:
             description = tree.find(f'.//{{{namespaces[ns_key]}}}description')
             if description is not None and description.text:
-                metadata['description'] = description.text.strip()
+                # Strip HTML from description
+                desc_text = description.text.strip()
+                desc_text = unescape(desc_text)
+                clean = re.compile('<.*?>')
+                desc_text = re.sub(clean, '', desc_text)
+                desc_text = ' '.join(desc_text.split())
+                metadata['description'] = desc_text
                 break
         
         for ns_key in ['dc', 'dc2']:
@@ -206,8 +229,10 @@ def process_calibre_book(book_folder_path):
             opf_file = file_path
         elif filename.endswith(('.pdf', '.epub')):
             book_file = file_path
-        elif filename.lower().endswith(('.jpg', '.jpeg', '.png')) and 'cover' in filename.lower():
-            cover_file = file_path
+        elif filename.lower().endswith(('.jpg', '.jpeg', '.png')):
+            # Accept any image file as potential cover
+            if not cover_file or 'cover' in filename.lower():
+                cover_file = file_path
     
     if not book_file:
         return None
@@ -215,6 +240,7 @@ def process_calibre_book(book_folder_path):
     # Extract metadata from OPF first
     if opf_file:
         metadata = extract_metadata_from_opf(opf_file)
+        print(f"OPF metadata for {book_folder_path}: {metadata}")
     
     # Get file info
     filename = os.path.basename(book_file)
@@ -232,6 +258,8 @@ def process_calibre_book(book_folder_path):
         if key not in metadata or not metadata.get(key):
             if key in book_metadata and book_metadata.get(key):
                 metadata[key] = book_metadata[key]
+    
+    print(f"Final metadata: {metadata}")
     
     return {
         'book_file': book_file,
@@ -425,19 +453,42 @@ def upload_calibre_zip():
                     shutil.copy2(book_data['book_file'], dest_path)
                     
                     cover_filename = None
+                    # Try to copy cover from Calibre folder first
                     if book_data['cover_file']:
-                        cover_filename = secure_filename(f"cover_{filename.rsplit('.', 1)[0]}.jpg")
+                        ext = os.path.splitext(book_data['cover_file'])[1]
+                        cover_filename = secure_filename(f"cover_{filename.rsplit('.', 1)[0]}{ext}")
                         cover_path = os.path.join(app.config['UPLOAD_FOLDER'], 'covers', cover_filename)
-                        shutil.copy2(book_data['cover_file'], cover_path)
-                    elif book_data['file_type'] == 'epub':
+                        try:
+                            shutil.copy2(book_data['cover_file'], cover_path)
+                            print(f"Copied cover: {book_data['cover_file']} -> {cover_path}")
+                        except Exception as e:
+                            print(f"Error copying cover: {e}")
+                            cover_filename = None
+                    
+                    # If no cover from Calibre and it's EPUB, try to extract
+                    if not cover_filename and book_data['file_type'] == 'epub':
                         cover_filename = extract_epub_cover(dest_path, f"cover_{filename.rsplit('.', 1)[0]}.jpg")
                     
                     metadata = book_data['metadata']
+                    
+                    # Get language - don't default to 'en' if not found
+                    book_language = metadata.get('language', None)
+                    if not book_language or book_language == 'en':
+                        # Try to detect from title or content
+                        if book_data['file_type'] == 'pdf':
+                            pdf_meta = extract_pdf_metadata(dest_path)
+                            book_language = pdf_meta.get('language', 'en')
+                        elif book_data['file_type'] == 'epub':
+                            epub_meta = extract_epub_metadata(dest_path)
+                            book_language = epub_meta.get('language', 'en')
+                    
+                    print(f"Creating book: {metadata.get('title', filename)} with language: {book_language}")
+                    
                     book = Book(
                         title=metadata.get('title', filename),
                         author=metadata.get('author', 'Unknown'),
                         description=metadata.get('description', ''),
-                        language=metadata.get('language', 'en'),
+                        language=book_language,
                         filename=filename,
                         cover_image=cover_filename,
                         file_type=book_data['file_type']
@@ -554,6 +605,29 @@ def delete_donation_link(link_id):
     db.session.delete(link)
     db.session.commit()
     flash('Donation link deleted!', 'success')
+    return redirect(url_for('admin_panel'))
+
+# Utility route to clean existing descriptions
+@app.route('/admin/clean-descriptions', methods=['POST'])
+def clean_descriptions():
+    """Strip HTML from all existing book descriptions"""
+    books = Book.query.all()
+    count = 0
+    for book in books:
+        if book.description:
+            old_desc = book.description
+            # Strip HTML
+            clean_desc = unescape(old_desc)
+            clean = re.compile('<.*?>')
+            clean_desc = re.sub(clean, '', clean_desc)
+            clean_desc = ' '.join(clean_desc.split())
+            
+            if clean_desc != old_desc:
+                book.description = clean_desc
+                count += 1
+    
+    db.session.commit()
+    flash(f'Cleaned HTML from {count} book descriptions!', 'success')
     return redirect(url_for('admin_panel'))
 
 if __name__ == '__main__':
