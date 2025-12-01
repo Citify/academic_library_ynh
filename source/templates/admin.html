@@ -302,7 +302,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
 {% block content %}
 <div class="admin-header">
-    <h2>📊 Admin Panel</h2>
+    <h2>📊 Admin Panel - Leshley's Library</h2>
     <div class="stats">
         <div class="stat-box">
             <div class="stat-number">{{ books|length }}</div>
@@ -320,6 +320,11 @@ window.addEventListener('DOMContentLoaded', () => {
             <div class="stat-number">{{ donation_links|length }}</div>
             <div class="stat-label">Donation Links</div>
         </div>
+    </div>
+    <div style="margin-top: 20px;">
+        <a href="{{ url_for('export_emails') }}" class="btn-primary" style="display: inline-block; text-decoration: none; padding: 12px 24px; font-size: 0.9em;">
+            📧 Export All Emails (CSV)
+        </a>
     </div>
 </div>
 
