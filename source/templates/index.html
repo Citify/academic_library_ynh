@@ -137,11 +137,17 @@
 {% block content %}
 <div class="search-bar">
     <form method="get" style="display: flex; gap: 10px; flex: 1; flex-wrap: wrap;">
-        <input type="text" name="search" placeholder="Search by title, author, or description..." value="{{ search_query or '' }}">
+        <input type="text" name="search" placeholder="Search by title, author, description, or subject..." value="{{ search_query or '' }}">
         <select name="language">
             <option value="">All Languages</option>
             {% for lang in languages %}
                 <option value="{{ lang }}" {% if lang == selected_language %}selected{% endif %}>{{ lang }}</option>
+            {% endfor %}
+        </select>
+        <select name="subject">
+            <option value="">All Subjects</option>
+            {% for subj in subjects %}
+                <option value="{{ subj }}" {% if subj == selected_subject %}selected{% endif %}>{{ subj }}</option>
             {% endfor %}
         </select>
         <button type="submit">🔍 Search</button>
@@ -183,4 +189,3 @@
     </div>
 {% endif %}
 {% endblock %}
-
