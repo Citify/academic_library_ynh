@@ -41,24 +41,66 @@
         .subtitle {
             font-size: 1.2em;
             color: #888;
+            margin-bottom: 30px;
         }
 
-        .donate-button {
+        .links-section {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+
+        .links-group {
+            background: #1a1a1a;
+            border-radius: 15px;
+            padding: 20px 30px;
+            border: 1px solid #333;
+        }
+
+        .links-group h3 {
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            color: #888;
+        }
+
+        .link-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .social-link,
+        .donation-link {
             display: inline-block;
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 12px 30px;
             text-decoration: none;
-            border-radius: 25px;
-            font-weight: bold;
-            margin: 20px 0;
+            border-radius: 8px;
             transition: all 0.3s;
+            text-align: center;
+        }
+
+        .social-link:hover,
+        .donation-link:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .donation-link {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        }
+
+        .donation-link:hover {
             box-shadow: 0 4px 15px rgba(40, 167, 69, 0.4);
         }
 
-        .donate-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(40, 167, 69, 0.6);
+        .link-description {
+            font-size: 0.85em;
+            color: #aaa;
+            margin-top: 5px;
         }
 
         .flash-messages {
@@ -106,7 +148,42 @@
         <header>
             <h1>📚 Academic Library</h1>
             <p class="subtitle">Free access to academic books and resources</p>
-            <a href="https://buymeacoffee.com/yournamehere" class="donate-button" target="_blank">☕ Support This Library</a>
+            
+            {% if donation_links or social_links %}
+            <div class="links-section">
+                {% if donation_links %}
+                <div class="links-group">
+                    <h3>💚 Support Us</h3>
+                    <div class="link-list">
+                        {% for link in donation_links %}
+                        <a href="{{ link.url }}" class="donation-link" target="_blank">
+                            {{ link.platform }}
+                            {% if link.description %}
+                            <div class="link-description">{{ link.description }}</div>
+                            {% endif %}
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if social_links %}
+                <div class="links-group">
+                    <h3>🌐 Connect With Us</h3>
+                    <div class="link-list">
+                        {% for link in social_links %}
+                        <a href="{{ link.url }}" class="social-link" target="_blank">
+                            {{ link.platform }}
+                            {% if link.description %}
+                            <div class="link-description">{{ link.description }}</div>
+                            {% endif %}
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
         </header>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
