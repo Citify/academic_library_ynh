@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, send_file, send_from_directory, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, send_file, send_from_directory, flash, jsonify, Response
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
 import os
@@ -12,6 +12,8 @@ import zipfile
 import shutil
 import re
 from html import unescape
+import csv
+from io import StringIO
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-super-secret-key-change-this-1234567890'
@@ -54,6 +56,7 @@ class Book(db.Model):
     cover_image = db.Column(db.String(500))
     upload_date = db.Column(db.DateTime, default=datetime.utcnow)
     file_type = db.Column(db.String(10))
+    subjects = db.Column(db.Text)  # Comma-separated tags/subjects
 
 class Download(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -449,14 +452,19 @@ def upload_calibre_zip():
                 
                 if book_data:
                     filename = secure_filename(os.path.basename(book_data['book_file']))
-                    dest_path = os.path.join(app.config['UPLOAD_FOLDER'], 'books', filename)
+                    # Make filename unique by adding timestamp
+                    base_name = filename.rsplit('.', 1)[0]
+                    extension = filename.rsplit('.', 1)[1]
+                    unique_filename = f"{base_name}_{int(datetime.now().timestamp())}.{extension}"
+                    
+                    dest_path = os.path.join(app.config['UPLOAD_FOLDER'], 'books', unique_filename)
                     shutil.copy2(book_data['book_file'], dest_path)
                     
                     cover_filename = None
                     # Try to copy cover from Calibre folder first
                     if book_data['cover_file']:
                         ext = os.path.splitext(book_data['cover_file'])[1]
-                        cover_filename = secure_filename(f"cover_{filename.rsplit('.', 1)[0]}{ext}")
+                        cover_filename = secure_filename(f"cover_{base_name}_{int(datetime.now().timestamp())}{ext}")
                         cover_path = os.path.join(app.config['UPLOAD_FOLDER'], 'covers', cover_filename)
                         try:
                             shutil.copy2(book_data['cover_file'], cover_path)
@@ -467,31 +475,34 @@ def upload_calibre_zip():
                     
                     # If no cover from Calibre and it's EPUB, try to extract
                     if not cover_filename and book_data['file_type'] == 'epub':
-                        cover_filename = extract_epub_cover(dest_path, f"cover_{filename.rsplit('.', 1)[0]}.jpg")
+                        cover_filename = extract_epub_cover(dest_path, f"cover_{base_name}_{int(datetime.now().timestamp())}.jpg")
                     
                     metadata = book_data['metadata']
                     
-                    # Get language - don't default to 'en' if not found
+                    # Get language - properly detect from metadata
                     book_language = metadata.get('language', None)
-                    if not book_language or book_language == 'en':
-                        # Try to detect from title or content
+                    if not book_language:
+                        # Try to detect from content
                         if book_data['file_type'] == 'pdf':
                             pdf_meta = extract_pdf_metadata(dest_path)
                             book_language = pdf_meta.get('language', 'en')
                         elif book_data['file_type'] == 'epub':
                             epub_meta = extract_epub_metadata(dest_path)
                             book_language = epub_meta.get('language', 'en')
+                        else:
+                            book_language = 'en'
                     
-                    print(f"Creating book: {metadata.get('title', filename)} with language: {book_language}")
+                    print(f"Creating book: {metadata.get('title', unique_filename)} with language: {book_language}, subjects: {metadata.get('subjects', 'None')}")
                     
                     book = Book(
-                        title=metadata.get('title', filename),
+                        title=metadata.get('title', unique_filename),
                         author=metadata.get('author', 'Unknown'),
                         description=metadata.get('description', ''),
                         language=book_language,
-                        filename=filename,
+                        filename=unique_filename,
                         cover_image=cover_filename,
-                        file_type=book_data['file_type']
+                        file_type=book_data['file_type'],
+                        subjects=metadata.get('subjects', '')
                     )
                     
                     db.session.add(book)
@@ -629,6 +640,29 @@ def clean_descriptions():
     db.session.commit()
     flash(f'Cleaned HTML from {count} book descriptions!', 'success')
     return redirect(url_for('admin_panel'))
+
+# CSV export for emails
+@app.route('/admin/export-emails')
+def export_emails():
+    """Export all collected emails as CSV"""
+    downloads = Download.query.join(Book).all()
+    
+    si = StringIO()
+    writer = csv.writer(si)
+    writer.writerow(['Email', 'Book Title', 'Book Author', 'Download Date'])
+    
+    for download in downloads:
+        book = Book.query.get(download.book_id)
+        writer.writerow([
+            download.email,
+            book.title if book else 'Unknown',
+            book.author if book else 'Unknown',
+            download.download_date.strftime('%Y-%m-%d %H:%M:%S')
+        ])
+    
+    output = Response(si.getvalue(), mimetype='text/csv')
+    output.headers['Content-Disposition'] = f'attachment; filename=library_emails_{datetime.now().strftime("%Y%m%d")}.csv'
+    return output
 
 if __name__ == '__main__':
     with app.app_context():
