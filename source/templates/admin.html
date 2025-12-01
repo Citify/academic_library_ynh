@@ -482,6 +482,12 @@ window.addEventListener('DOMContentLoaded', () => {
     <h3>📚 Manage Books ({{ books|length }})</h3>
     
     {% if books %}
+        <form method="post" action="{{ url_for('clean_descriptions') }}" style="margin-bottom: 20px;" onsubmit="return confirm('Clean HTML tags from all book descriptions?');">
+            <button type="submit" class="btn-primary btn-purple" style="padding: 10px 20px; font-size: 1em;">
+                🧹 Clean HTML from All Descriptions
+            </button>
+        </form>
+        
         {% for book in books %}
         <div class="book-item">
             <div class="book-item-header">
