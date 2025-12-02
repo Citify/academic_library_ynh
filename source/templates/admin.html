@@ -419,7 +419,14 @@ window.addEventListener('DOMContentLoaded', () => {
                     <option value="zh-cn">Chinese</option>
                     <option value="ja">Japanese</option>
                     <option value="ko">Korean</option>
+                    <option value="ar">Arabic</option>
+                    <option value="el">Greek</option>
                 </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Subjects/Tags (Optional - comma-separated)</label>
+                <input type="text" name="subjects" placeholder="e.g., Philosophy, Rhetoric, Education">
             </div>
             
             <button type="submit" class="btn-primary">Upload Book</button>
@@ -547,10 +554,11 @@ window.addEventListener('DOMContentLoaded', () => {
             
             <div id="edit-form-{{ book.id }}" class="edit-form">
                 <form method="post" action="{{ url_for('edit_book', book_id=book.id) }}">
-                    <input type="text" name="title" value="{{ book.title }}" required>
-                    <input type="text" name="author" value="{{ book.author }}" required>
-                    <textarea name="description">{{ book.description or '' }}</textarea>
-                    <input type="text" name="language" value="{{ book.language or '' }}" placeholder="Language code (e.g., en)">
+                    <input type="text" name="title" value="{{ book.title }}" placeholder="Title" required>
+                    <input type="text" name="author" value="{{ book.author }}" placeholder="Author" required>
+                    <textarea name="description" placeholder="Description">{{ book.description or '' }}</textarea>
+                    <input type="text" name="language" value="{{ book.language or '' }}" placeholder="Language code (e.g., en, ko, ar)">
+                    <input type="text" name="subjects" value="{{ book.subjects or '' }}" placeholder="Subjects (comma-separated, e.g., Philosophy, Rhetoric)">
                     <div class="edit-actions">
                         <button type="submit" class="btn-edit">Save Changes</button>
                         <button type="button" class="btn-delete-small" onclick="toggleEdit({{ book.id }})">Cancel</button>
