@@ -452,10 +452,12 @@ def upload_calibre_zip():
                 
                 if book_data:
                     filename = secure_filename(os.path.basename(book_data['book_file']))
-                    # Make filename unique by adding timestamp
+                    # Make filename unique by adding counter to avoid collisions
+                    import time
+                    unique_id = f"{int(time.time() * 1000000)}"  # Microseconds for uniqueness
                     base_name = filename.rsplit('.', 1)[0]
                     extension = filename.rsplit('.', 1)[1]
-                    unique_filename = f"{base_name}_{int(datetime.now().timestamp())}.{extension}"
+                    unique_filename = f"{base_name}_{unique_id}.{extension}"
                     
                     dest_path = os.path.join(app.config['UPLOAD_FOLDER'], 'books', unique_filename)
                     shutil.copy2(book_data['book_file'], dest_path)
@@ -464,35 +466,44 @@ def upload_calibre_zip():
                     # Try to copy cover from Calibre folder first
                     if book_data['cover_file']:
                         ext = os.path.splitext(book_data['cover_file'])[1]
-                        cover_filename = secure_filename(f"cover_{base_name}_{int(datetime.now().timestamp())}{ext}")
+                        cover_unique_id = f"{int(time.time() * 1000000)}"
+                        cover_filename = secure_filename(f"cover_{base_name}_{cover_unique_id}{ext}")
                         cover_path = os.path.join(app.config['UPLOAD_FOLDER'], 'covers', cover_filename)
                         try:
                             shutil.copy2(book_data['cover_file'], cover_path)
                             print(f"Copied cover: {book_data['cover_file']} -> {cover_path}")
+                            time.sleep(0.001)  # Small delay to ensure unique timestamps
                         except Exception as e:
                             print(f"Error copying cover: {e}")
                             cover_filename = None
                     
                     # If no cover from Calibre and it's EPUB, try to extract
                     if not cover_filename and book_data['file_type'] == 'epub':
-                        cover_filename = extract_epub_cover(dest_path, f"cover_{base_name}_{int(datetime.now().timestamp())}.jpg")
+                        cover_filename = extract_epub_cover(dest_path, f"cover_{base_name}_{unique_id}.jpg")
                     
                     metadata = book_data['metadata']
                     
-                    # Get language - properly detect from metadata
-                    book_language = metadata.get('language', None)
+                    # Get language - CRITICAL FIX
+                    book_language = metadata.get('language')
+                    print(f"Language from metadata: {book_language}")
+                    
                     if not book_language:
-                        # Try to detect from content
+                        # Try to detect from content as fallback
                         if book_data['file_type'] == 'pdf':
                             pdf_meta = extract_pdf_metadata(dest_path)
-                            book_language = pdf_meta.get('language', 'en')
+                            book_language = pdf_meta.get('language')
                         elif book_data['file_type'] == 'epub':
                             epub_meta = extract_epub_metadata(dest_path)
-                            book_language = epub_meta.get('language', 'en')
-                        else:
-                            book_language = 'en'
+                            book_language = epub_meta.get('language')
                     
-                    print(f"Creating book: {metadata.get('title', unique_filename)} with language: {book_language}, subjects: {metadata.get('subjects', 'None')}")
+                    # Default to 'en' only if absolutely no language found
+                    if not book_language:
+                        book_language = 'en'
+                    
+                    print(f"Creating book: {metadata.get('title', unique_filename)}")
+                    print(f"  Language: {book_language}")
+                    print(f"  Subjects: {metadata.get('subjects', 'None')}")
+                    print(f"  Cover: {cover_filename}")
                     
                     book = Book(
                         title=metadata.get('title', unique_filename),
@@ -507,6 +518,9 @@ def upload_calibre_zip():
                     
                     db.session.add(book)
                     books_added += 1
+                    
+                    # Small delay between books to ensure unique IDs
+                    time.sleep(0.002)
     
     except Exception as e:
         print(f"Error processing ZIP: {e}")
@@ -662,6 +676,17 @@ def export_emails():
     
     output = Response(si.getvalue(), mimetype='text/csv')
     output.headers['Content-Disposition'] = f'attachment; filename=library_emails_{datetime.now().strftime("%Y%m%d")}.csv'
+    return output
+
+# Debug route to check languages
+@app.route('/admin/debug-languages')
+def debug_languages():
+    """Show all books with their languages for debugging"""
+    books = Book.query.all()
+    output = "<h1>Language Debug</h1><ul>"
+    for book in books:
+        output += f"<li><strong>{book.title}</strong>: {book.language}</li>"
+    output += "</ul>"
     return output
 
 if __name__ == '__main__':
