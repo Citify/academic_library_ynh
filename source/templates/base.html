@@ -169,7 +169,11 @@
     <div class="container">
         <header>
             <div class="logo-title">
-                <img src="{{ url_for('static', filename='logo.jpg') }}" class="logo" alt="Leshley's Library Logo" onerror="this.style.display='none'">
+                {% if logo_exists %}
+                <img src="{{ url_for('static', filename=logo_filename) }}" class="logo" alt="Lyon Leshley">
+                {% else %}
+                <div class="logo" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; font-size: 2em; font-weight: bold;">LL</div>
+                {% endif %}
                 <h1>Leshley's Library</h1>
             </div>
             <p class="subtitle">Free academic books in 28+ languages</p>
