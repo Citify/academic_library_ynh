@@ -343,8 +343,21 @@ def admin_panel():
     social_links = SocialLink.query.order_by(SocialLink.order).all()
     donation_links = DonationLink.query.order_by(DonationLink.order).all()
     
+    # Check for logo file
+    logo_exists = False
+    logo_filename = 'logo.jpg'
+    static_dir = os.path.join(os.path.dirname(__file__), 'static')
+    
+    for ext in ['jpg', 'jpeg', 'png', 'gif', 'webp', 'JPG', 'JPEG', 'PNG', 'GIF', 'WEBP']:
+        logo_path = os.path.join(static_dir, f'logo.{ext}')
+        if os.path.exists(logo_path):
+            logo_exists = True
+            logo_filename = f'logo.{ext}'
+            break
+    
     return render_template('admin.html', books=books, total_downloads=total_downloads,
-                         social_links=social_links, donation_links=donation_links)
+                         social_links=social_links, donation_links=donation_links,
+                         logo_exists=logo_exists, logo_filename=logo_filename)
 
 @app.route('/admin/upload', methods=['POST'])
 def upload_book():
@@ -688,6 +701,65 @@ def debug_languages():
         output += f"<li><strong>{book.title}</strong>: {book.language}</li>"
     output += "</ul>"
     return output
+
+# Logo upload
+@app.route('/admin/upload-logo', methods=['POST'])
+def upload_logo():
+    """Upload logo image"""
+    if 'logo_file' not in request.files:
+        flash('No file selected', 'error')
+        return redirect(url_for('admin_panel'))
+    
+    file = request.files['logo_file']
+    
+    if file.filename == '':
+        flash('No file selected', 'error')
+        return redirect(url_for('admin_panel'))
+    
+    # Check if it's an image
+    allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+    if '.' in file.filename and file.filename.rsplit('.', 1)[1].lower() in allowed_extensions:
+        # Get file extension
+        ext = file.filename.rsplit('.', 1)[1].lower()
+        
+        # Create static directory if it doesn't exist
+        static_dir = os.path.join(os.path.dirname(__file__), 'static')
+        os.makedirs(static_dir, exist_ok=True)
+        
+        # Remove old logo files
+        for old_ext in ['jpg', 'jpeg', 'png', 'gif', 'webp', 'JPG', 'JPEG', 'PNG', 'GIF', 'WEBP']:
+            old_logo = os.path.join(static_dir, f'logo.{old_ext}')
+            if os.path.exists(old_logo):
+                os.remove(old_logo)
+        
+        # Save new logo
+        logo_path = os.path.join(static_dir, f'logo.{ext}')
+        file.save(logo_path)
+        
+        flash('Logo uploaded successfully!', 'success')
+    else:
+        flash('Invalid file type. Please upload an image (PNG, JPG, GIF, or WebP)', 'error')
+    
+    return redirect(url_for('admin_panel'))
+
+@app.route('/admin/delete-logo', methods=['POST'])
+def delete_logo():
+    """Delete the logo"""
+    static_dir = os.path.join(os.path.dirname(__file__), 'static')
+    
+    deleted = False
+    for ext in ['jpg', 'jpeg', 'png', 'gif', 'webp', 'JPG', 'JPEG', 'PNG', 'GIF', 'WEBP']:
+        logo_path = os.path.join(static_dir, f'logo.{ext}')
+        if os.path.exists(logo_path):
+            os.remove(logo_path)
+            deleted = True
+    
+    if deleted:
+        flash('Logo deleted successfully!', 'success')
+    else:
+        flash('No logo found to delete', 'error')
+    
+    return redirect(url_for('admin_panel'))
 
 if __name__ == '__main__':
     with app.app_context():
