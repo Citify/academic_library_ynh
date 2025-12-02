@@ -543,6 +543,11 @@ window.addEventListener('DOMContentLoaded', () => {
                 <div>
                     <div class="book-item-title">{{ book.title }}</div>
                     <div class="book-item-author">by {{ book.author }} • {{ book.file_type|upper }} • {{ book.language or 'Unknown' }}</div>
+                    {% if book.subjects %}
+                    <div style="color: #666; font-size: 0.85em; margin-top: 5px;">
+                        🏷️ {{ book.subjects }}
+                    </div>
+                    {% endif %}
                 </div>
                 <div class="book-actions">
                     <button class="btn-edit" onclick="toggleEdit({{ book.id }})">Edit</button>
