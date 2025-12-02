@@ -414,6 +414,7 @@ def upload_book():
         final_author = request.form.get('author', '').strip() or metadata.get('author', '') or 'Unknown'
         final_description = request.form.get('description', '').strip() or metadata.get('description', '') or ''
         final_language = request.form.get('language', '').strip() or metadata.get('language', '') or 'en'
+        final_subjects = request.form.get('subjects', '').strip() or metadata.get('subjects', '') or ''
         
         book = Book(
             title=final_title,
@@ -422,7 +423,8 @@ def upload_book():
             language=final_language,
             filename=filename,
             cover_image=cover_filename,
-            file_type=file_type
+            file_type=file_type,
+            subjects=final_subjects
         )
         
         db.session.add(book)
@@ -557,6 +559,7 @@ def edit_book(book_id):
     author = request.form.get('author', '').strip()
     description = request.form.get('description', '').strip()
     language = request.form.get('language', '').strip()
+    subjects = request.form.get('subjects', '').strip()
     
     if not title:
         flash('Title cannot be empty', 'error')
@@ -566,6 +569,7 @@ def edit_book(book_id):
     book.author = author if author else 'Unknown'
     book.description = description
     book.language = language if language else 'en'
+    book.subjects = subjects
     
     db.session.commit()
     flash(f'Book "{book.title}" updated successfully!', 'success')
