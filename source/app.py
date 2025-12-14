@@ -668,4 +668,185 @@ def delete_book(book_id):
     if book.cover_image:
         cover_path = os.path.join(app.config['UPLOAD_FOLDER'], 'covers', book.cover_image)
         if os.path.exists(cover_path):
-            os.remove(
+            os.remove(cover_path)
+    
+    Download.query.filter_by(book_id=book_id).delete()
+    
+    db.session.delete(book)
+    db.session.commit()
+    
+    flash(f'Book "{book.title}" deleted successfully!', 'success')
+    return redirect(url_for('admin_panel'))
+
+# Social Links Management
+@app.route('/admin/social/add', methods=['POST'])
+def add_social_link():
+    platform = request.form.get('platform', '').strip()
+    url = request.form.get('url', '').strip()
+    description = request.form.get('description', '').strip()
+    
+    if platform and url:
+        max_order = db.session.query(db.func.max(SocialLink.order)).scalar() or 0
+        social = SocialLink(platform=platform, url=url, description=description, order=max_order + 1)
+        db.session.add(social)
+        db.session.commit()
+        flash(f'Social link "{platform}" added!', 'success')
+    else:
+        flash('Platform and URL are required', 'error')
+    
+    return redirect(url_for('admin_panel'))
+
+@app.route('/admin/social/delete/<int:link_id>', methods=['POST'])
+def delete_social_link(link_id):
+    link = SocialLink.query.get_or_404(link_id)
+    db.session.delete(link)
+    db.session.commit()
+    flash('Social link deleted!', 'success')
+    return redirect(url_for('admin_panel'))
+
+# Donation Links Management
+@app.route('/admin/donation/add', methods=['POST'])
+def add_donation_link():
+    platform = request.form.get('platform', '').strip()
+    url = request.form.get('url', '').strip()
+    description = request.form.get('description', '').strip()
+    
+    if platform and url:
+        max_order = db.session.query(db.func.max(DonationLink.order)).scalar() or 0
+        donation = DonationLink(platform=platform, url=url, description=description, order=max_order + 1)
+        db.session.add(donation)
+        db.session.commit()
+        flash(f'Donation link "{platform}" added!', 'success')
+    else:
+        flash('Platform and URL are required', 'error')
+    
+    return redirect(url_for('admin_panel'))
+
+@app.route('/admin/donation/delete/<int:link_id>', methods=['POST'])
+def delete_donation_link(link_id):
+    link = DonationLink.query.get_or_404(link_id)
+    db.session.delete(link)
+    db.session.commit()
+    flash('Donation link deleted!', 'success')
+    return redirect(url_for('admin_panel'))
+
+# Utility route to clean existing descriptions
+@app.route('/admin/clean-descriptions', methods=['POST'])
+def clean_descriptions():
+    """Strip HTML from all existing book descriptions"""
+    books = Book.query.all()
+    count = 0
+    for book in books:
+        if book.description:
+            old_desc = book.description
+            # Strip HTML
+            clean_desc = unescape(old_desc)
+            clean = re.compile('<.*?>')
+            clean_desc = re.sub(clean, '', clean_desc)
+            clean_desc = ' '.join(clean_desc.split())
+            
+            if clean_desc != old_desc:
+                book.description = clean_desc
+                count += 1
+    
+    db.session.commit()
+    flash(f'Cleaned HTML from {count} book descriptions!', 'success')
+    return redirect(url_for('admin_panel'))
+
+# CSV export for emails
+@app.route('/admin/export-emails')
+def export_emails():
+    """Export all collected emails as CSV"""
+    downloads = Download.query.join(Book).all()
+    
+    si = StringIO()
+    writer = csv.writer(si)
+    writer.writerow(['Email', 'Book Title', 'Book Author', 'Download Date'])
+    
+    for download in downloads:
+        book = Book.query.get(download.book_id)
+        writer.writerow([
+            download.email,
+            book.title if book else 'Unknown',
+            book.author if book else 'Unknown',
+            download.download_date.strftime('%Y-%m-%d %H:%M:%S')
+        ])
+    
+    output = Response(si.getvalue(), mimetype='text/csv')
+    output.headers['Content-Disposition'] = f'attachment; filename=library_emails_{datetime.now().strftime("%Y%m%d")}.csv'
+    return output
+
+# Debug route to check languages
+@app.route('/admin/debug-languages')
+def debug_languages():
+    """Show all books with their languages for debugging"""
+    books = Book.query.all()
+    output = "<h1>Language Debug</h1><ul>"
+    for book in books:
+        output += f"<li><strong>{book.title}</strong>: {book.language}</li>"
+    output += "</ul>"
+    return output
+
+# Logo upload
+@app.route('/admin/upload-logo', methods=['POST'])
+def upload_logo():
+    """Upload logo image"""
+    if 'logo_file' not in request.files:
+        flash('No file selected', 'error')
+        return redirect(url_for('admin_panel'))
+    
+    file = request.files['logo_file']
+    
+    if file.filename == '':
+        flash('No file selected', 'error')
+        return redirect(url_for('admin_panel'))
+    
+    # Check if it's an image
+    allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+    if '.' in file.filename and file.filename.rsplit('.', 1)[1].lower() in allowed_extensions:
+        # Get file extension
+        ext = file.filename.rsplit('.', 1)[1].lower()
+        
+        # Create static directory if it doesn't exist
+        static_dir = os.path.join(os.path.dirname(__file__), 'static')
+        os.makedirs(static_dir, exist_ok=True)
+        
+        # Remove old logo files
+        for old_ext in ['jpg', 'jpeg', 'png', 'gif', 'webp', 'JPG', 'JPEG', 'PNG', 'GIF', 'WEBP']:
+            old_logo = os.path.join(static_dir, f'logo.{old_ext}')
+            if os.path.exists(old_logo):
+                os.remove(old_logo)
+        
+        # Save new logo
+        logo_path = os.path.join(static_dir, f'logo.{ext}')
+        file.save(logo_path)
+        
+        flash('Logo uploaded successfully!', 'success')
+    else:
+        flash('Invalid file type. Please upload an image (PNG, JPG, GIF, or WebP)', 'error')
+    
+    return redirect(url_for('admin_panel'))
+
+@app.route('/admin/delete-logo', methods=['POST'])
+def delete_logo():
+    """Delete the logo"""
+    static_dir = os.path.join(os.path.dirname(__file__), 'static')
+    
+    deleted = False
+    for ext in ['jpg', 'jpeg', 'png', 'gif', 'webp', 'JPG', 'JPEG', 'PNG', 'GIF', 'WEBP']:
+        logo_path = os.path.join(static_dir, f'logo.{ext}')
+        if os.path.exists(logo_path):
+            os.remove(logo_path)
+            deleted = True
+    
+    if deleted:
+        flash('Logo deleted successfully!', 'success')
+    else:
+        flash('No logo found to delete', 'error')
+    
+    return redirect(url_for('admin_panel'))
+
+if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
+    app.run(host='0.0.0.0', port=5000, debug=False)
