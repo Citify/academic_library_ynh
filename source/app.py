@@ -1,3 +1,4 @@
+# Ask Ollama client
 from flask import Flask, render_template, request, redirect, url_for, send_file, send_from_directory, flash, jsonify, Response
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
@@ -45,6 +46,21 @@ SUPPORTED_LANGUAGES = [
     'hr', 'hu', 'it', 'ja', 'ko', 'lt', 'lv', 'nl', 'pl', 'pt', 'ro', 'ru',
     'sv', 'tr', 'uk', 'zh-cn'
 ]
+
+# NEW: Helper function to get all unique subjects
+def get_all_subjects():
+    """Extract all unique subjects from all books"""
+    books = Book.query.all()
+    subjects = set()
+    
+    for book in books:
+        if book.subjects:
+            # Split comma-separated subjects and clean them
+            book_subjects = [s.strip() for s in book.subjects.split(',') if s.strip()]
+            subjects.update(book_subjects)
+    
+    # Return sorted list for nice alphabetical display
+    return sorted(subjects)
 
 class Book(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -108,18 +124,21 @@ def extract_metadata_from_opf(opf_path):
         
         metadata = {}
         
+        # Extract title
         for ns_key in ['dc', 'dc2']:
             title = tree.find(f'.//{{{namespaces[ns_key]}}}title')
             if title is not None and title.text:
                 metadata['title'] = title.text.strip()
                 break
         
+        # Extract author
         for ns_key in ['dc', 'dc2']:
             creator = tree.find(f'.//{{{namespaces[ns_key]}}}creator')
             if creator is not None and creator.text:
                 metadata['author'] = creator.text.strip()
                 break
         
+        # Extract description
         for ns_key in ['dc', 'dc2']:
             description = tree.find(f'.//{{{namespaces[ns_key]}}}description')
             if description is not None and description.text:
@@ -132,15 +151,62 @@ def extract_metadata_from_opf(opf_path):
                 metadata['description'] = desc_text
                 break
         
+        # Extract language with comprehensive mapping
         for ns_key in ['dc', 'dc2']:
             language = tree.find(f'.//{{{namespaces[ns_key]}}}language')
             if language is not None and language.text:
                 lang = language.text.strip().lower()
-                if lang.startswith('en'):
-                    lang = 'en'
-                elif lang in SUPPORTED_LANGUAGES:
-                    metadata['language'] = lang
+                
+                # Map ISO 639-2/3 codes to ISO 639-1
+                lang_map = {
+                    'en': 'en', 'eng': 'en',
+                    'ko': 'ko', 'kor': 'ko',
+                    'ar': 'ar', 'ara': 'ar',
+                    'el': 'el', 'ell': 'el', 'gre': 'el', 'grc': 'el',
+                    'zh': 'zh-cn', 'chi': 'zh-cn', 'zho': 'zh-cn',
+                    'ja': 'ja', 'jpn': 'ja',
+                    'es': 'es', 'spa': 'es',
+                    'fr': 'fr', 'fra': 'fr', 'fre': 'fr',
+                    'de': 'de', 'deu': 'de', 'ger': 'de',
+                    'it': 'it', 'ita': 'it',
+                    'pt': 'pt', 'por': 'pt',
+                    'ru': 'ru', 'rus': 'ru',
+                    'nl': 'nl', 'nld': 'nl', 'dut': 'nl',
+                    'pl': 'pl', 'pol': 'pl',
+                    'tr': 'tr', 'tur': 'tr',
+                    'sv': 'sv', 'swe': 'sv',
+                    'da': 'da', 'dan': 'da',
+                    'fi': 'fi', 'fin': 'fi',
+                    'cs': 'cs', 'ces': 'cs', 'cze': 'cs',
+                    'hu': 'hu', 'hun': 'hu',
+                    'ro': 'ro', 'ron': 'ro', 'rum': 'ro',
+                    'bg': 'bg', 'bul': 'bg',
+                    'hr': 'hr', 'hrv': 'hr',
+                    'uk': 'uk', 'ukr': 'uk',
+                    'et': 'et', 'est': 'et',
+                    'lv': 'lv', 'lav': 'lv',
+                    'lt': 'lt', 'lit': 'lt',
+                    'ca': 'ca', 'cat': 'ca',
+                }
+                
+                mapped_lang = lang_map.get(lang, lang)
+                if mapped_lang in SUPPORTED_LANGUAGES:
+                    metadata['language'] = mapped_lang
                 break
+        
+        # NEW: Extract subjects/tags from OPF
+        subjects = []
+        for ns_key in ['dc', 'dc2']:
+            subject_elements = tree.findall(f'.//{{{namespaces[ns_key]}}}subject')
+            for subject_elem in subject_elements:
+                if subject_elem.text:
+                    subjects.append(subject_elem.text.strip())
+        
+        if subjects:
+            # Join with commas and remove duplicates
+            unique_subjects = list(dict.fromkeys(subjects))  # Preserves order
+            metadata['subjects'] = ', '.join(unique_subjects)
+            print(f"Found subjects in OPF: {metadata['subjects']}")
         
         return metadata
     except Exception as e:
@@ -275,6 +341,7 @@ def process_calibre_book(book_folder_path):
 def index():
     search_query = request.args.get('search', '')
     language_filter = request.args.get('language', '')
+    subject_filter = request.args.get('subject', '')  # NEW: Add subject filter
     
     query = Book.query
     
@@ -284,25 +351,39 @@ def index():
             db.or_(
                 Book.title.ilike(search_pattern),
                 Book.author.ilike(search_pattern),
-                Book.description.ilike(search_pattern)
+                Book.description.ilike(search_pattern),
+                Book.subjects.ilike(search_pattern)  # Also search in subjects
             )
         )
     
     if language_filter:
         query = query.filter(Book.language == language_filter)
     
+    # NEW: Filter by subject if provided
+    if subject_filter:
+        query = query.filter(Book.subjects.ilike(f'%{subject_filter}%'))
+    
     books = query.order_by(Book.upload_date.desc()).all()
     
     languages = db.session.query(Book.language).distinct().all()
     languages = [lang[0] for lang in languages if lang[0]]
     
+    # NEW: Get all subjects dynamically from database
+    all_subjects = get_all_subjects()
+    
     # Get social and donation links
     social_links = SocialLink.query.order_by(SocialLink.order).all()
     donation_links = DonationLink.query.order_by(DonationLink.order).all()
     
-    return render_template('index.html', books=books, search_query=search_query, 
-                         languages=languages, selected_language=language_filter,
-                         social_links=social_links, donation_links=donation_links)
+    return render_template('index.html', 
+                         books=books, 
+                         search_query=search_query, 
+                         languages=languages, 
+                         selected_language=language_filter,
+                         subjects=all_subjects,  # NEW: Pass subjects to template
+                         selected_subject=subject_filter,  # NEW: Pass selected subject
+                         social_links=social_links, 
+                         donation_links=donation_links)
 
 @app.route('/book/<int:book_id>')
 def book_page(book_id):
@@ -587,185 +668,4 @@ def delete_book(book_id):
     if book.cover_image:
         cover_path = os.path.join(app.config['UPLOAD_FOLDER'], 'covers', book.cover_image)
         if os.path.exists(cover_path):
-            os.remove(cover_path)
-    
-    Download.query.filter_by(book_id=book_id).delete()
-    
-    db.session.delete(book)
-    db.session.commit()
-    
-    flash(f'Book "{book.title}" deleted successfully!', 'success')
-    return redirect(url_for('admin_panel'))
-
-# Social Links Management
-@app.route('/admin/social/add', methods=['POST'])
-def add_social_link():
-    platform = request.form.get('platform', '').strip()
-    url = request.form.get('url', '').strip()
-    description = request.form.get('description', '').strip()
-    
-    if platform and url:
-        max_order = db.session.query(db.func.max(SocialLink.order)).scalar() or 0
-        social = SocialLink(platform=platform, url=url, description=description, order=max_order + 1)
-        db.session.add(social)
-        db.session.commit()
-        flash(f'Social link "{platform}" added!', 'success')
-    else:
-        flash('Platform and URL are required', 'error')
-    
-    return redirect(url_for('admin_panel'))
-
-@app.route('/admin/social/delete/<int:link_id>', methods=['POST'])
-def delete_social_link(link_id):
-    link = SocialLink.query.get_or_404(link_id)
-    db.session.delete(link)
-    db.session.commit()
-    flash('Social link deleted!', 'success')
-    return redirect(url_for('admin_panel'))
-
-# Donation Links Management
-@app.route('/admin/donation/add', methods=['POST'])
-def add_donation_link():
-    platform = request.form.get('platform', '').strip()
-    url = request.form.get('url', '').strip()
-    description = request.form.get('description', '').strip()
-    
-    if platform and url:
-        max_order = db.session.query(db.func.max(DonationLink.order)).scalar() or 0
-        donation = DonationLink(platform=platform, url=url, description=description, order=max_order + 1)
-        db.session.add(donation)
-        db.session.commit()
-        flash(f'Donation link "{platform}" added!', 'success')
-    else:
-        flash('Platform and URL are required', 'error')
-    
-    return redirect(url_for('admin_panel'))
-
-@app.route('/admin/donation/delete/<int:link_id>', methods=['POST'])
-def delete_donation_link(link_id):
-    link = DonationLink.query.get_or_404(link_id)
-    db.session.delete(link)
-    db.session.commit()
-    flash('Donation link deleted!', 'success')
-    return redirect(url_for('admin_panel'))
-
-# Utility route to clean existing descriptions
-@app.route('/admin/clean-descriptions', methods=['POST'])
-def clean_descriptions():
-    """Strip HTML from all existing book descriptions"""
-    books = Book.query.all()
-    count = 0
-    for book in books:
-        if book.description:
-            old_desc = book.description
-            # Strip HTML
-            clean_desc = unescape(old_desc)
-            clean = re.compile('<.*?>')
-            clean_desc = re.sub(clean, '', clean_desc)
-            clean_desc = ' '.join(clean_desc.split())
-            
-            if clean_desc != old_desc:
-                book.description = clean_desc
-                count += 1
-    
-    db.session.commit()
-    flash(f'Cleaned HTML from {count} book descriptions!', 'success')
-    return redirect(url_for('admin_panel'))
-
-# CSV export for emails
-@app.route('/admin/export-emails')
-def export_emails():
-    """Export all collected emails as CSV"""
-    downloads = Download.query.join(Book).all()
-    
-    si = StringIO()
-    writer = csv.writer(si)
-    writer.writerow(['Email', 'Book Title', 'Book Author', 'Download Date'])
-    
-    for download in downloads:
-        book = Book.query.get(download.book_id)
-        writer.writerow([
-            download.email,
-            book.title if book else 'Unknown',
-            book.author if book else 'Unknown',
-            download.download_date.strftime('%Y-%m-%d %H:%M:%S')
-        ])
-    
-    output = Response(si.getvalue(), mimetype='text/csv')
-    output.headers['Content-Disposition'] = f'attachment; filename=library_emails_{datetime.now().strftime("%Y%m%d")}.csv'
-    return output
-
-# Debug route to check languages
-@app.route('/admin/debug-languages')
-def debug_languages():
-    """Show all books with their languages for debugging"""
-    books = Book.query.all()
-    output = "<h1>Language Debug</h1><ul>"
-    for book in books:
-        output += f"<li><strong>{book.title}</strong>: {book.language}</li>"
-    output += "</ul>"
-    return output
-
-# Logo upload
-@app.route('/admin/upload-logo', methods=['POST'])
-def upload_logo():
-    """Upload logo image"""
-    if 'logo_file' not in request.files:
-        flash('No file selected', 'error')
-        return redirect(url_for('admin_panel'))
-    
-    file = request.files['logo_file']
-    
-    if file.filename == '':
-        flash('No file selected', 'error')
-        return redirect(url_for('admin_panel'))
-    
-    # Check if it's an image
-    allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
-    if '.' in file.filename and file.filename.rsplit('.', 1)[1].lower() in allowed_extensions:
-        # Get file extension
-        ext = file.filename.rsplit('.', 1)[1].lower()
-        
-        # Create static directory if it doesn't exist
-        static_dir = os.path.join(os.path.dirname(__file__), 'static')
-        os.makedirs(static_dir, exist_ok=True)
-        
-        # Remove old logo files
-        for old_ext in ['jpg', 'jpeg', 'png', 'gif', 'webp', 'JPG', 'JPEG', 'PNG', 'GIF', 'WEBP']:
-            old_logo = os.path.join(static_dir, f'logo.{old_ext}')
-            if os.path.exists(old_logo):
-                os.remove(old_logo)
-        
-        # Save new logo
-        logo_path = os.path.join(static_dir, f'logo.{ext}')
-        file.save(logo_path)
-        
-        flash('Logo uploaded successfully!', 'success')
-    else:
-        flash('Invalid file type. Please upload an image (PNG, JPG, GIF, or WebP)', 'error')
-    
-    return redirect(url_for('admin_panel'))
-
-@app.route('/admin/delete-logo', methods=['POST'])
-def delete_logo():
-    """Delete the logo"""
-    static_dir = os.path.join(os.path.dirname(__file__), 'static')
-    
-    deleted = False
-    for ext in ['jpg', 'jpeg', 'png', 'gif', 'webp', 'JPG', 'JPEG', 'PNG', 'GIF', 'WEBP']:
-        logo_path = os.path.join(static_dir, f'logo.{ext}')
-        if os.path.exists(logo_path):
-            os.remove(logo_path)
-            deleted = True
-    
-    if deleted:
-        flash('Logo deleted successfully!', 'success')
-    else:
-        flash('No logo found to delete', 'error')
-    
-    return redirect(url_for('admin_panel'))
-
-if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
-    app.run(host='0.0.0.0', port=5000, debug=False)
+            os.remove(
