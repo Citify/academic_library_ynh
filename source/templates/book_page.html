@@ -1,26 +1,24 @@
 {% extends "base.html" %}
 
-{% block title %}{{ book.title }} - Academic Library{% endblock %}
-
 {% block extra_css %}
 <style>
-    .book-detail {
-        max-width: 900px;
-        margin: 0 auto;
+    .book-detail-container {
+        max-width: 1000px;
+        margin: 40px auto;
         background: #1a1a1a;
         border-radius: 15px;
         overflow: hidden;
         border: 1px solid #333;
     }
 
-    .book-header {
+    .book-detail-header {
         display: grid;
         grid-template-columns: 300px 1fr;
-        gap: 30px;
-        padding: 30px;
+        gap: 40px;
+        padding: 40px;
     }
 
-    .book-cover-large {
+    .book-detail-cover {
         width: 100%;
         height: 400px;
         object-fit: cover;
@@ -32,58 +30,98 @@
         font-size: 6em;
     }
 
-    .book-cover-large img {
+    .book-detail-cover img {
         width: 100%;
         height: 100%;
         object-fit: cover;
         border-radius: 10px;
     }
 
-    .book-details h2 {
+    .book-detail-info h1 {
         font-size: 2em;
-        margin-bottom: 15px;
+        margin-bottom: 10px;
+        color: #fff;
     }
 
-    .book-author-large {
-        font-size: 1.3em;
+    .book-detail-author {
+        font-size: 1.2em;
         color: #888;
         margin-bottom: 20px;
     }
 
-    .book-meta-large {
+    .book-meta-tags {
         display: flex;
-        gap: 15px;
-        margin: 20px 0;
+        gap: 10px;
+        margin-bottom: 20px;
         flex-wrap: wrap;
     }
 
-    .badge-large {
+    .meta-badge {
         padding: 8px 16px;
         border-radius: 20px;
-        background: #2a2a2a;
-        color: #888;
         font-size: 0.9em;
+        background: rgba(102, 126, 234, 0.2);
+        border: 1px solid #667eea;
+        color: #667eea;
     }
 
-    .description-section {
-        padding: 30px;
+    .book-subjects {
+        margin: 20px 0;
+    }
+
+    .book-subjects h3 {
+        font-size: 1em;
+        color: #888;
+        margin-bottom: 10px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .subject-tags {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .subject-tag {
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 0.9em;
+        background: #2a2a2a;
+        color: #fff;
+        border: 1px solid #444;
+        cursor: pointer;
+        transition: all 0.3s;
+        text-decoration: none;
+        display: inline-block;
+    }
+
+    .subject-tag:hover {
+        background: rgba(102, 126, 234, 0.3);
+        border-color: #667eea;
+        transform: translateY(-2px);
+    }
+
+    .book-description {
+        padding: 40px;
         border-top: 1px solid #333;
     }
 
-    .description-section h3 {
-        font-size: 1.5em;
-        margin-bottom: 15px;
+    .book-description h2 {
+        margin-bottom: 20px;
+        color: #fff;
     }
 
-    .description-text {
+    .book-description p {
         line-height: 1.8;
-        color: #aaa;
+        color: #ccc;
+        font-size: 1.1em;
     }
 
     .download-section {
-        padding: 30px;
+        padding: 40px;
+        background: #0a0a0a;
         border-top: 1px solid #333;
-        background: #0f0f0f;
     }
 
     .download-form {
@@ -91,36 +129,39 @@
     }
 
     .download-form h3 {
-        font-size: 1.5em;
-        margin-bottom: 15px;
+        margin-bottom: 20px;
+        color: #fff;
     }
 
-    .download-form p {
+    .form-group {
         margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
         color: #888;
     }
 
-    .download-form input[type="email"] {
+    .form-group input {
         width: 100%;
-        padding: 15px;
+        padding: 12px 20px;
         border: 1px solid #333;
         background: #1a1a1a;
         color: #fff;
         border-radius: 8px;
         font-size: 1em;
-        margin-bottom: 15px;
     }
 
     .download-button {
-        width: 100%;
-        padding: 15px;
+        padding: 15px 40px;
         background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
         color: white;
         border: none;
         border-radius: 8px;
-        font-size: 1.1em;
-        font-weight: bold;
         cursor: pointer;
+        font-weight: bold;
+        font-size: 1.1em;
         transition: all 0.3s;
     }
 
@@ -131,19 +172,33 @@
 
     .back-link {
         display: inline-block;
-        margin-bottom: 20px;
-        color: #888;
+        margin: 20px 40px;
+        padding: 10px 20px;
+        background: #2a2a2a;
+        color: #fff;
         text-decoration: none;
-        font-size: 1.1em;
+        border-radius: 8px;
+        transition: all 0.3s;
     }
 
     .back-link:hover {
-        color: #fff;
+        background: #333;
+        transform: translateX(-5px);
     }
 
     @media (max-width: 768px) {
-        .book-header {
+        .book-detail-header {
             grid-template-columns: 1fr;
+            padding: 20px;
+        }
+
+        .book-detail-cover {
+            height: 300px;
+        }
+
+        .book-description,
+        .download-section {
+            padding: 20px;
         }
     }
 </style>
@@ -152,41 +207,59 @@
 {% block content %}
 <a href="{{ url_for('index') }}" class="back-link">← Back to Library</a>
 
-<div class="book-detail">
-    <div class="book-header">
-        <div class="book-cover-large">
+<div class="book-detail-container">
+    <div class="book-detail-header">
+        <div class="book-detail-cover">
             {% if book.cover_image %}
                 <img src="{{ url_for('serve_uploads', subpath='covers', filename=book.cover_image) }}" alt="{{ book.title }}">
             {% else %}
                 📖
             {% endif %}
         </div>
-        <div class="book-details">
-            <h2>{{ book.title }}</h2>
-            <div class="book-author-large">by {{ book.author }}</div>
-            <div class="book-meta-large">
-                <span class="badge-large">{{ book.file_type|upper }}</span>
+
+        <div class="book-detail-info">
+            <h1>{{ book.title }}</h1>
+            <p class="book-detail-author">by {{ book.author }}</p>
+
+            <div class="book-meta-tags">
+                <span class="meta-badge">{{ book.file_type|upper }}</span>
                 {% if book.language %}
-                    <span class="badge-large">{{ book.language }}</span>
+                    <span class="meta-badge">{{ book.language }}</span>
                 {% endif %}
-                <span class="badge-large">Uploaded: {{ book.upload_date.strftime('%B %d, %Y') }}</span>
+                <span class="meta-badge">📅 {{ book.upload_date.strftime('%Y-%m-%d') }}</span>
             </div>
+
+            <!-- NEW: Display subjects as clickable tags -->
+            {% if book.subjects %}
+            <div class="book-subjects">
+                <h3>Subjects</h3>
+                <div class="subject-tags">
+                    {% for subject in book.subjects.split(',') %}
+                        <a href="{{ url_for('index', subject=subject.strip()) }}" class="subject-tag">
+                            {{ subject.strip() }}
+                        </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
 
     {% if book.description %}
-    <div class="description-section">
-        <h3>Description</h3>
-        <div class="description-text">{{ book.description|strip_html }}</div>
+    <div class="book-description">
+        <h2>About This Book</h2>
+        <p>{{ book.description|strip_html }}</p>
     </div>
     {% endif %}
 
     <div class="download-section">
         <form method="post" action="{{ url_for('download_book', book_id=book.id) }}" class="download-form">
-            <h3>Download This Book</h3>
-            <p>Enter your email to download this book for free. We'll never spam you!</p>
-            <input type="email" name="email" placeholder="your@email.com" required>
-            <button type="submit" class="download-button">📥 Download {{ book.file_type|upper }}</button>
+            <h3>📥 Download This Book</h3>
+            <div class="form-group">
+                <label for="email">Enter your email to download:</label>
+                <input type="email" id="email" name="email" required placeholder="your@email.com">
+            </div>
+            <button type="submit" class="download-button">Download {{ book.file_type|upper }}</button>
         </form>
     </div>
 </div>
