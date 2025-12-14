@@ -144,6 +144,7 @@
                 <option value="{{ lang }}" {% if lang == selected_language %}selected{% endif %}>{{ lang }}</option>
             {% endfor %}
         </select>
+        <!-- NEW: Dynamic subject filter -->
         <select name="subject">
             <option value="">All Subjects</option>
             {% for subj in subjects %}
@@ -173,6 +174,12 @@
                     {% if book.language %}
                         <span class="badge">{{ book.language }}</span>
                     {% endif %}
+                    <!-- NEW: Show first 2 subjects as badges -->
+                    {% if book.subjects %}
+                        {% for subject in book.subjects.split(',')[:2] %}
+                            <span class="badge">{{ subject.strip() }}</span>
+                        {% endfor %}
+                    {% endif %}
                 </div>
                 <a href="{{ url_for('book_page', book_id=book.id) }}" class="view-button">View Details</a>
             </div>
@@ -181,7 +188,7 @@
     </div>
 {% else %}
     <div class="no-books">
-        {% if search_query or selected_language %}
+        {% if search_query or selected_language or selected_subject %}
             No books found matching your search criteria.
         {% else %}
             No books available yet. Check back soon!
