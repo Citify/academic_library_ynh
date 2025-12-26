@@ -410,7 +410,7 @@ def download_book(book_id):
 def admin():
     if request.method == 'POST':
         password = request.form.get('password')
-        if password == 'Citation6-Outweigh7-Worried8-Unneeded0-Eccentric7':
+        if password == '':
             return redirect(url_for('admin_panel'))
         else:
             flash('Incorrect password', 'error')
